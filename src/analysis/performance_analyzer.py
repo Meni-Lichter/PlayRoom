@@ -2,7 +2,6 @@ from datetime import datetime, date
 from typing import List, Dict
 from collections import defaultdict
 from dateutil.relativedelta import relativedelta
-
 from ..models import SalesRecord, PerformanceData, TimePeriod
 from ..utils import get_period_key
 
