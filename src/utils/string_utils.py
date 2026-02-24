@@ -5,6 +5,7 @@ def normalize_identifier(value):
     """
     Normalize an identifier (like room number or 12NC) by:
     - Converting to string
+    - Removing decimal points if present (e.g., 989606130501.0 -> 989606130501)
     - Removing spaces, hyphens, and underscores
     - Stripping leading and trailing whitespace
     input : 
@@ -15,8 +16,16 @@ def normalize_identifier(value):
     if pd.isna(value):
         return ""
     
-    # Convert to string first, then remove all non-alphanumeric characters
-    normalized = str(value).replace(" ", "").replace("-", "").replace("_", "").strip()
+    # Convert to string first
+    normalized = str(value).strip()
+    
+    # Remove decimal point and any trailing zeros from float representation
+    # E.g., "989606130501.0" -> "989606130501"
+    if '.' in normalized:
+        normalized = normalized.split('.')[0]
+    
+    # Remove all non-alphanumeric characters (spaces, hyphens, underscores)
+    normalized = normalized.replace(" ", "").replace("-", "").replace("_", "")
     
     return normalized
 

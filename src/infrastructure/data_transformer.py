@@ -60,10 +60,29 @@ def transform_cbom_data(room_data: dict, data_12nc: dict, config: dict):
         room_mappings.append(Room12NCMap(room=room, twelve_ncs=valid_twelve_ncs))
 
     # Validate and transform 12NC data
+    target_12nc = "989606130501"
+    print(f"\n[TRANSFORM DEBUG] Transforming 12NC data...")
+    print(f"[TRANSFORM DEBUG] Looking for {target_12nc} in data_12nc...")
+    print(f"[TRANSFORM DEBUG] Total 12NCs in data_12nc: {len(data_12nc)}")
+    
+    if target_12nc in data_12nc:
+        print(f"[TRANSFORM DEBUG] ✓ Found {target_12nc} in data_12nc")
+    else:
+        print(f"[TRANSFORM DEBUG] ✗ {target_12nc} NOT in data_12nc")
+        print(f"[TRANSFORM DEBUG] Sample keys (first 10): {list(data_12nc.keys())[:10]}")
+    
     for nc12, rooms_df in data_12nc.items():
         if not re.match(config["validation"]["patterns"]["12nc_normalized"], str(nc12)):
             print(f"Warning: 12NC '{nc12}' does not match expected format. Skipping.")
             continue
+
+        # DEBUG: Track target through transformation
+        if nc12 == target_12nc:
+            print(f"[TRANSFORM DEBUG] Processing {target_12nc}...")
+            print(f"[TRANSFORM DEBUG] rooms_df type: {type(rooms_df)}")
+            if isinstance(rooms_df, pd.DataFrame):
+                print(f"[TRANSFORM DEBUG] rooms_df shape: {rooms_df.shape}")
+                print(f"[TRANSFORM DEBUG] rooms_df columns: {rooms_df.columns.tolist()}")
 
         # Convert DataFrame to dict {Room: Quantity}
         if isinstance(rooms_df, pd.DataFrame):
@@ -90,5 +109,15 @@ def transform_cbom_data(room_data: dict, data_12nc: dict, config: dict):
             continue
 
         nc12_mappings.append(TwelveNCRoomMap(twelve_nc=str(nc12), rooms=valid_rooms))
+        
+        # DEBUG: Confirm target was added
+        if nc12 == target_12nc:
+            print(f"[TRANSFORM DEBUG] ✓ Added {target_12nc} to nc12_mappings with {len(valid_rooms)} rooms")
+
+    # DEBUG: Final check
+    print(f"\n[TRANSFORM DEBUG] Transformation complete")
+    print(f"[TRANSFORM DEBUG] Total nc12_mappings created: {len(nc12_mappings)}")
+    target_in_mappings = any(m.twelve_nc == target_12nc for m in nc12_mappings)
+    print(f"[TRANSFORM DEBUG] Target {target_12nc} in final nc12_mappings: {target_in_mappings}")
 
     return room_mappings, nc12_mappings

@@ -63,6 +63,33 @@ class PerformanceAnalyzer:
         output:
             - List of SalesRecord that match the criteria
         """
+        # DEBUG: Track filtering for specific 12NC
+        target_12nc = "989606130501"
+        if identifier == target_12nc:
+            print(f"\n[ANALYZER DEBUG] Filtering sales for {identifier}")
+            print(f"[ANALYZER DEBUG] Total sales records: {len(self.sales_data)}")
+            print(f"[ANALYZER DEBUG] Date range: {start_date} to {end_date}")
+            print(f"[ANALYZER DEBUG] ID type: {id_type}")
+            
+            # Count matches
+            matching = [s for s in self.sales_data if s.twelve_nc == identifier]
+            print(f"[ANALYZER DEBUG] Records matching 12NC {identifier}: {len(matching)}")
+            
+            in_date_range = [s for s in matching if start_date <= s.date <= end_date]
+            print(f"[ANALYZER DEBUG] Records in date range: {len(in_date_range)}")
+            
+            if len(matching) > 0:
+                print(f"[ANALYZER DEBUG] Sample dates for {identifier}: {[s.date for s in matching[:3]]}")
+                print(f"[ANALYZER DEBUG] Total quantity in matching records: {sum(s.quantity for s in matching)}")
+            
+            if len(in_date_range) > 0:
+                print(f"[ANALYZER DEBUG] Total quantity in date range: {sum(s.quantity for s in in_date_range)}")
+                print(f"[ANALYZER DEBUG] Date range of matching: {min(s.date for s in in_date_range)} to {max(s.date for s in in_date_range)}")
+            
+            # Show sample of 12NCs in data
+            unique_12ncs = list(set([s.twelve_nc for s in self.sales_data]))[:10]
+            print(f"[ANALYZER DEBUG] Sample 12NCs in data: {unique_12ncs}")
+        
         return [
             s
             for s in self.sales_data

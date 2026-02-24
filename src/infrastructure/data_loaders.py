@@ -63,6 +63,31 @@ def load_cbom(cbom_path, config):
     nc12_numbers = df.iloc[nc12_row_start_idx:, nc12_col_idx].values
     nc12_descriptions = df.iloc[nc12_row_start_idx:, nc12_desc_col_idx].values
 
+    # DEBUG: Check for target 12NC in raw CBOM data
+    target_12nc = "989606130501"
+    print(f"\n[CBOM DEBUG] Looking for 12NC {target_12nc} in CBOM file...")
+    print(f"[CBOM DEBUG] Total 12NCs in CBOM: {len(nc12_numbers)}")
+    print(f"[CBOM DEBUG] First 5 raw 12NC values: {nc12_numbers[:5]}")
+    print(f"[CBOM DEBUG] First 5 values types: {[type(nc12_numbers[i]) for i in range(min(5, len(nc12_numbers)))]}")
+    
+    # Check for target considering it might have hyphens (9896-061-30501)
+    target_with_hyphens = f"{target_12nc[:4]}-{target_12nc[4:7]}-{target_12nc[7:]}"  # "9896-061-30501"
+    print(f"[CBOM DEBUG] Also looking for hyphenated format: {target_with_hyphens}")
+    
+    found_raw = False
+    for idx, nc in enumerate(nc12_numbers):
+        if pd.isna(nc):
+            continue
+        nc_str = str(nc).strip()
+        # Check both formats
+        if target_12nc in nc_str or target_with_hyphens in nc_str:
+            print(f"[CBOM DEBUG] Found target in raw data at index {idx}: '{nc}' (type: {type(nc)})")
+            found_raw = True
+            break
+    
+    if not found_raw:
+        print(f"[CBOM DEBUG] Target {target_12nc} (or {target_with_hyphens}) NOT found in raw 12NC data")
+
     # Extract the quantity matrix (from nc12_row_start, room columns onwards)
     quantity_matrix = df.iloc[nc12_row_start_idx:, room_col_idx:].values
 
@@ -91,6 +116,10 @@ def load_cbom(cbom_path, config):
                 continue
 
             nc12_num_normalized = normalize_identifier(nc12_num)
+            
+            # DEBUG: Track normalization of target 12NC
+            if target_12nc in str(nc12_num) or nc12_num_normalized == target_12nc:
+                print(f"[CBOM DEBUG] Normalizing 12NC: '{nc12_num}' -> '{nc12_num_normalized}'")
 
             # Validate normalized format (12 digits)
             if (
@@ -127,6 +156,10 @@ def load_cbom(cbom_path, config):
     # Process data for each 12NC
     ############################
     valid_12nc_count = 0
+    target_found_in_processing = False
+    print(f"\n[CBOM DEBUG] Processing 12NCs...")
+    print(f"[CBOM DEBUG] First 10 normalized 12NCs:")
+    
     for nc12_idx, nc12_num in enumerate(nc12_numbers):
         if pd.isna(nc12_num):
             continue
@@ -134,6 +167,15 @@ def load_cbom(cbom_path, config):
         nc12_num_str = str(nc12_num).strip()
 
         nc12_num_normalized = normalize_identifier(nc12_num_str)
+        
+        # DEBUG: Show first 10 normalizations
+        if nc12_idx < 10:
+            print(f"  [{nc12_idx}] '{nc12_num}' -> '{nc12_num_normalized}'")
+        
+        # DEBUG: Track target 12NC through processing
+        if nc12_num_normalized == target_12nc:
+            target_found_in_processing = True
+            print(f"[CBOM DEBUG] ✓✓✓ Processing target 12NC: raw='{nc12_num}' normalized='{nc12_num_normalized}'")
 
         # Validate normalized format (12 digits)
         if not re.match(config["validation"]["patterns"]["12nc_normalized"], nc12_num_normalized):
@@ -178,10 +220,23 @@ def load_cbom(cbom_path, config):
         if nc12_rooms:
             data_12nc[nc12_num_normalized] = pd.DataFrame(nc12_rooms)
 
+    # DEBUG: Final check for target 12NC in mappings
+    print(f"\n[CBOM DEBUG] Target {target_12nc} found during processing: {target_found_in_processing}")
+    print(f"[CBOM DEBUG] Total valid 12NCs processed: {valid_12nc_count}")
+    print(f"[CBOM DEBUG] Total 12NCs in data_12nc dict: {len(data_12nc)}")
+    
+    if target_12nc in data_12nc:
+        print(f"[CBOM DEBUG] ✓ Target {target_12nc} IS in data_12nc!")
+        rooms_for_target = data_12nc[target_12nc]
+        print(f"[CBOM DEBUG] Rooms for {target_12nc}: {list(rooms_for_target['Room'].values)}")
+    else:
+        print(f"[CBOM DEBUG] ✗ Target {target_12nc} NOT in data_12nc")
+        print(f"[CBOM DEBUG] Sample keys in data_12nc (first 10): {list(data_12nc.keys())[:10]}")
+
     return room_data, data_12nc
 
 
-def read_file(path: Path, file_type: str, header=None) -> pd.DataFrame | None:
+def read_file(path: Path, file_type: str, header=None, converters=None) -> pd.DataFrame | None:
     """
     Reads an Excel or CSV file into a DataFrame, handling different formats and errors.
     Meant primarily to be used for reading FIT_CVI files but can be used for other file types as well with appropriate configuration.
@@ -190,6 +245,7 @@ def read_file(path: Path, file_type: str, header=None) -> pd.DataFrame | None:
         path (Path): The path to the file to read.
         file_type (str): The type of the file ('excel' or 'csv').
         header (int, list of int, None): Row(s) to use as the column names. Defaults to None.
+        converters (dict, optional): Dict of functions for converting values in certain columns. Keys can be integers or column labels.
     Returns:
         pd.DataFrame: The contents of the file as a DataFrame, or None if an error occurred.
     """
@@ -218,13 +274,21 @@ def read_file(path: Path, file_type: str, header=None) -> pd.DataFrame | None:
         relevant_sheet = pick_sheet(path, file_type, config)
         print(f"Using sheet: {relevant_sheet} from file: {path.name}")
 
+        # Prepare converters for specific file types to prevent unwanted type conversions
+        converters_dict = converters.copy() if converters else {}
+        
+        if file_type == "ymbd":
+            # Force Component column to be read as string to prevent float conversion
+            # which can cause issues like 989606130501 becoming 989606130501.0
+            converters_dict["Component"] = lambda x: str(x).strip()
+
         # Read file based on extension
         if ext == ".csv":
-            df = pd.read_csv(path, header=header)
+            df = pd.read_csv(path, header=header, converters=converters_dict if converters_dict else None)
         elif ext in [".xlsx", ".xlsm"]:
-            df = pd.read_excel(path, sheet_name=relevant_sheet, header=header, engine="openpyxl")
+            df = pd.read_excel(path, sheet_name=relevant_sheet, header=header, engine="openpyxl", converters=converters_dict if converters_dict else None)
         elif ext in [".xls"]:
-            df = pd.read_excel(path, sheet_name=relevant_sheet, header=header, engine="xlrd")
+            df = pd.read_excel(path, sheet_name=relevant_sheet, header=header, engine="xlrd", converters=converters_dict if converters_dict else None)
             print("read .xls file with pandas")
         else:
             raise ValueError(
