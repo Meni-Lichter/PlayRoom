@@ -1,76 +1,54 @@
 # take loaded data from data_loaders and transform it into the format needed for the application
+from hmac import new
 import re
-from typing import List
+from typing import Dict, List
 import pandas as pd
+from pyparsing.diagram import T
+import pandas as pd
+import os
 
+import logging
 from src.models.mapping import Room, TwelveNC
 from src.models.sales_record import SalesRecord
 from src.utils.config_util import load_config
 from .data_loaders import read_file, load_cbom
+from src.utils.string_utils import normalize_identifier
+from datetime import datetime
 
 
 def transform_cbom_data(
-    room_data: dict, 
-    data_12nc: dict,
-    config: dict
+    room_data: dict, data_12nc: dict, config: dict
 ) -> tuple[List[Room], List[TwelveNC]]:
     """Transform raw CBOM data into structured Room and TwelveNC objects
-    
+
     input:
     - room_data: dict with room numbers as keys and dicts containing {'description': str, '12ncs': DataFrame}
     - data_12nc: dict with 12NCs as keys and dicts containing {'description': str, 'rooms': DataFrame}
     - config: configuration dictionary for validation patterns
 
     output:
-    - room_mappings: list of Room objects
-    - nc12_mappings: list of TwelveNC objects
+    - rooms: list of Room objects with attributes room, room_description, twelve_ncs (dict of 12NC: quantity)
+    - nc12s: list of TwelveNC objects with attributes twelve_nc, tnc_description, rooms (dict of Room: quantity)
     """
     if not room_data or not data_12nc:
         raise ValueError("Input data cannot be empty")
 
-    if config is None:
-        raise ValueError("Configuration cannot be None")
+    rooms: List[Room] = []
+    nc12s: List[TwelveNC] = []
 
-    room_mappings: List[Room] = []
-    nc12_mappings: List[TwelveNC] = []
+    # Fix: twelve_ncs should be Dict[str, int] not Dict[TwelveNC, int]
+    for room, room_df in room_data.items():
+        twelve_ncs_dict = {}  # Not Dict[TwelveNC, int]
 
-    # Validate and transform room data
-    for room, room_info in room_data.items():
-        if not re.match(config["validation"]["patterns"]["room_normalized"], room):
-            print(f"Warning: Room '{room}' does not match expected format. Skipping.")
-            continue
+        # Convert DataFrame rows to dict entries
+        for idx, row in room_df.iterrows():
+            twelve_ncs_dict[row["12NC"]] = int(row["Quantity"])
 
-        # Extract description and 12NCs DataFrame
-        room_description = room_info['description']
-        twelve_ncs_df = room_info['12ncs']
-
-        # Convert DataFrame to dict {12NC: Quantity}
-        twelve_ncs_dict = dict(zip(twelve_ncs_df["12NC"], twelve_ncs_df["Quantity"]))
-
-        # Validate 12NCs and convert quantities to integers
-        valid_twelve_ncs = {}
-        for nc, qty in twelve_ncs_dict.items():
-            if re.match(config["validation"]["patterns"]["12nc_normalized"], str(nc)):
-                # Handle various quantity formats
-                if pd.isna(qty):
-                    qty_int = 0
-                elif isinstance(qty, (int, float)):
-                    qty_int = int(qty)
-                else:
-                    qty_str = str(qty).strip()
-                    qty_int = int(qty_str) if qty_str and qty_str.isdigit() else 0
-                valid_twelve_ncs[str(nc)] = qty_int
-
-        if not valid_twelve_ncs:
-            print(f"Warning: No valid 12NCs found for room '{room}'. Skipping.")
-            continue
-
-        # Create Room object with empty sales history
-        room_mappings.append(
+        rooms.append(
             Room(
                 room=room,
-                room_description=room_description,
-                twelve_ncs=valid_twelve_ncs,
+                room_description=room_df["12NC_Description"].iloc[0],
+                twelve_ncs=twelve_ncs_dict,  # Use the dict, not valid_twelve_ncs
                 sales_history=[],
             )
         )
@@ -87,14 +65,14 @@ def transform_cbom_data(
         print(f"[TRANSFORM DEBUG] ✗ {target_12nc} NOT in data_12nc")
         print(f"[TRANSFORM DEBUG] Sample keys (first 10): {list(data_12nc.keys())[:10]}")
 
-    for nc12, nc12_info in data_12nc.items():
+    for nc12, nc12_df in data_12nc.items():
         if not re.match(config["validation"]["patterns"]["12nc_normalized"], str(nc12)):
             print(f"Warning: 12NC '{nc12}' does not match expected format. Skipping.")
             continue
 
         # Extract description and rooms DataFrame
-        nc12_description = nc12_info['description']
-        rooms_df = nc12_info['rooms']
+        nc12_description = nc12_df["description"]
+        rooms_df = nc12_df["rooms"]
 
         # DEBUG: Track target through transformation
         if nc12 == target_12nc:
@@ -103,32 +81,17 @@ def transform_cbom_data(
             print(f"[TRANSFORM DEBUG] rooms_df shape: {rooms_df.shape}")
             print(f"[TRANSFORM DEBUG] rooms_df columns: {rooms_df.columns.tolist()}")
 
-        # Convert DataFrame to dict {Room: Quantity}
-        rooms_dict = dict(zip(rooms_df["Room"], rooms_df["Quantity"]))
-
         # Validate rooms and convert quantities to integers
         valid_rooms = {}
-        for room, qty in rooms_dict.items():
-            if re.match(config["validation"]["patterns"]["room_normalized"], str(room)):
-                # Handle various quantity formats
-                if pd.isna(qty):
-                    qty_int = 0
-                elif isinstance(qty, (int, float)):
-                    qty_int = int(qty)
-                else:
-                    qty_str = str(qty).strip()
-                    qty_int = int(qty_str) if qty_str and qty_str.isdigit() else 0
-                valid_rooms[str(room)] = qty_int
+        # Convert DataFrame rows to dict entries
+        for idx, row in rooms_df.iterrows():
+            valid_rooms[row["Room"]] = int(row["Quantity"])
 
-        if not valid_rooms:
-            print(f"Warning: No valid rooms found for 12NC '{nc12}'. Skipping.")
-            continue
-
-        # Create TwelveNC object with empty sales history
-        nc12_mappings.append(
+        nc12s.append(
             TwelveNC(
-                twelve_nc=str(nc12),
+                twelve_nc=nc12,
                 tnc_description=nc12_description,
+                tnc_igt=row["12NC_IGT"],
                 rooms=valid_rooms,
                 sales_history=[],
             )
@@ -136,17 +99,15 @@ def transform_cbom_data(
 
         # DEBUG: Confirm target was added
         if nc12 == target_12nc:
-            print(
-                f"[TRANSFORM DEBUG] ✓ Added {target_12nc} to nc12_mappings with {len(valid_rooms)} rooms"
-            )
+            print(f"[TRANSFORM DEBUG] ✓ Added {target_12nc} to nc12s with {len(valid_rooms)} rooms")
 
     # DEBUG: Final check
     print(f"\n[TRANSFORM DEBUG] Transformation complete")
-    print(f"[TRANSFORM DEBUG] Total nc12_mappings created: {len(nc12_mappings)}")
-    target_in_mappings = any(m.twelve_nc == target_12nc for m in nc12_mappings)
-    print(f"[TRANSFORM DEBUG] Target {target_12nc} in final nc12_mappings: {target_in_mappings}")
+    print(f"[TRANSFORM DEBUG] Total nc12s created: {len(nc12s)}")
+    target_in_mappings = any(m.twelve_nc == target_12nc for m in nc12s)
+    print(f"[TRANSFORM DEBUG] Target {target_12nc} in final nc12s: {target_in_mappings}")
 
-    return room_mappings, nc12_mappings
+    return rooms, nc12s
 
 
 def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
@@ -223,9 +184,7 @@ def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
                     )
 
             quantity = int(row["Component Quantity"])
-            sales_record = SalesRecord(
-                twelve_nc=twelve_nc, room="UNKNOWN", quantity=quantity, date=sales_date
-            )
+            sales_record = SalesRecord(identifier=twelve_nc, quantity=quantity, date=sales_date)
             # We'll need room mapping from CBOM
             sales_records.append(sales_record)
         except Exception as e:
@@ -236,7 +195,7 @@ def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
 
     # Additional debug: Show summary of quantities found
     if matching_count > 0:
-        target_quantities = [r.quantity for r in sales_records if r.twelve_nc == target_12nc]
+        target_quantities = [r.quantity for r in sales_records if r.identifier == target_12nc]
         print(f"[YMBD DEBUG] Total quantity sum for {target_12nc}: {sum(target_quantities)}")
         print(f"[YMBD DEBUG] Number of records: {len(target_quantities)}")
         print(
@@ -278,9 +237,7 @@ def parse_fit_cvi_to_sales_records(fit_cvi_df) -> List[SalesRecord]:
             room = str(row["Characteristic\nCharacteristic Name"]).strip()
             quantity = int(row["(Self)\nValue from"])
 
-            sales_record = SalesRecord(
-                twelve_nc="ROOM_LEVEL_DATA", room=room, quantity=quantity, date=sales_date
-            )
+            sales_record = SalesRecord(identifier=room, quantity=quantity, date=sales_date)
             sales_records.append(sales_record)
         except Exception as e:
             print(f"Warning: Skipping row due to error: {e}")

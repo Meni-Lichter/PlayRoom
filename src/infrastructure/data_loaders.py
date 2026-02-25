@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def load_cbom(cbom_path, config):
+def load_cbom(cbom_path, config) -> tuple[dict, dict]:
     """
     Reads the CBOM Excel file and extracts room-12NC relationships.
 
@@ -34,22 +34,27 @@ def load_cbom(cbom_path, config):
     - data_12nc: Dictionary {12nc_number:  rooms['Room(normalized)','Room(original)', 'Room_Description', 'Quantity']}}
     """
 
+    # Initialize dictionaries to hold data
+    room_data = {}
+    data_12nc = {}
+
     # Get configuration values
     room_col_start = config["cbom"]["columns"].get("room_start", "G")
     room_num_row = config["cbom"]["rows"].get("room_numbers", 5)
     room_desc_row = config["cbom"]["rows"].get("room_descriptions", 4)
     nc12_col = config["cbom"]["columns"].get("12nc", "C")
     nc12_desc_col = config["cbom"]["columns"].get("12nc_description", "D")
+    nc12_igt_col = config["cbom"]["columns"].get("12nc_igt", "A")
     nc12_row_start = config["cbom"]["rows"].get("12nc_start", 9)
 
     df = read_file(cbom_path, "cbom", header=None)
     if df is None:
-        return None, None, None, None
+        return room_data, data_12nc
 
     room_col_idx = col_letter_to_index(room_col_start)
     nc12_col_idx = col_letter_to_index(nc12_col)
     nc12_desc_col_idx = col_letter_to_index(nc12_desc_col)
-
+    nc12_igt_col_idx = col_letter_to_index(nc12_igt_col)
     # Convert 1-indexed rows to 0-indexed
     room_num_row_idx = room_num_row - 1
     room_desc_row_idx = room_desc_row - 1
@@ -62,7 +67,7 @@ def load_cbom(cbom_path, config):
     # Extract 12NC information (starting from nc12_row_start)
     nc12_numbers = df.iloc[nc12_row_start_idx:, nc12_col_idx].values
     nc12_descriptions = df.iloc[nc12_row_start_idx:, nc12_desc_col_idx].values
-
+    nc12_igts = df.iloc[nc12_row_start_idx:, nc12_igt_col_idx].values
     # DEBUG: Check for target 12NC in raw CBOM data
     target_12nc = "989606130501"
     print(f"\n[CBOM DEBUG] Looking for 12NC {target_12nc} in CBOM file...")
@@ -98,10 +103,6 @@ def load_cbom(cbom_path, config):
 
     # Extract the quantity matrix (from nc12_row_start, room columns onwards)
     quantity_matrix = df.iloc[nc12_row_start_idx:, room_col_idx:].values
-
-    # Initialize dictionaries to hold data
-    room_data = {}
-    data_12nc = {}
 
     ############################
     # Process data for each room
@@ -144,7 +145,7 @@ def load_cbom(cbom_path, config):
             # Only include if quantity exists and is not zero
             if pd.isna(quantity):
                 quantity = 0
-
+            nc12_igt = str(nc12_igts[nc12_idx]).strip() if not pd.isna(nc12_igts[nc12_idx]) else ""
             nc12_desc = (
                 str(nc12_descriptions[nc12_idx]).strip()
                 if not pd.isna(nc12_descriptions[nc12_idx])
@@ -154,6 +155,7 @@ def load_cbom(cbom_path, config):
             room_12ncs.append(
                 {
                     "12NC": nc12_num_normalized,  # Store normalized version
+                    "12NC_IGT": nc12_igt,  # Store IGT 12NC if available
                     "12NC_Original": str(nc12_num).strip(),  # Keep original for reference
                     "12NC_Description": nc12_desc,
                     "Quantity": quantity,

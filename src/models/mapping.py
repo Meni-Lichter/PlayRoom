@@ -9,7 +9,7 @@ class Room:
 
     room: str
     room_description: str
-    twelve_ncs: Dict[TwelveNC, int]  # {12NC: quantity}
+    twelve_ncs: Dict[str, int]  # {12NC: quantity}
     sales_history: List[SalesRecord]  # {12NC: SalesRecord}
 
     @property
@@ -56,7 +56,7 @@ class TwelveNC:
     twelve_nc: str
     tnc_description: str
     tnc_igt: str
-    rooms: Dict[Room, int]  # {room: quantity}
+    rooms: Dict[str, int]  # {room: quantity}
     sales_history: List[SalesRecord]  # {room: SalesRecord}
 
     @property
