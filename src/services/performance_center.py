@@ -1,7 +1,7 @@
 """Performance Center - High-level service orchestrating all features"""
 
 from typing import List, Dict, Optional
-from ..models import SalesRecord, PerformanceData, Prediction, Room12NCMap, TwelveNCRoomMap
+from ..models import SalesRecord, PerformanceData, Prediction, Room, TwelveNC
 from ..analysis import PerformanceAnalyzer, Predictor
 
 
@@ -11,16 +11,16 @@ class PerformanceCenter:
     def __init__(
         self,
         sales_data: List[SalesRecord],
-        room_mappings: Optional[List[Room12NCMap]] = None,
-        nc12_mappings: Optional[List[TwelveNCRoomMap]] = None,
+        room_mappings: Optional[List[Room]] = None,
+        nc12_mappings: Optional[List[TwelveNC]] = None,
     ):
         """
         Initialize Performance Center with sales data and optional mappings
 
         Args:
             sales_data: List of historical sales records
-            room_mappings: Optional list of Room12NCMap objects (CBOM data)
-            nc12_mappings: Optional list of TwelveNCRoomMap objects (CBOM data)
+            room_mappings: Optional list of Room objects (CBOM data)
+            nc12_mappings: Optional list of TwelveNC objects (CBOM data)
         """
         self.sales_data = sales_data
         self.room_mappings = room_mappings or []
@@ -115,7 +115,7 @@ class PerformanceCenter:
         predictor = Predictor(performance)
         return predictor.predict(method=method, buffer_percentage=buffer_percentage)
 
-    def get_room_components(self, room: str) -> Optional[Room12NCMap]:
+    def get_room_components(self, room: str) -> Optional[Room]:
         """
         Get the 12NC components for a specific room from CBOM data (Feature 1)
 
@@ -123,14 +123,14 @@ class PerformanceCenter:
             room: Room identifier
 
         Returns:
-            Room12NCMap object or None if not found
+            Room object or None if not found
         """
         for mapping in self.room_mappings:
             if mapping.room == room:
                 return mapping
         return None
 
-    def get_12nc_rooms(self, twelve_nc: str) -> Optional[TwelveNCRoomMap]:
+    def get_12nc_rooms(self, twelve_nc: str) -> Optional[TwelveNC]:
         """
         Get the rooms containing a specific 12NC from CBOM data (Feature 1)
 
@@ -138,7 +138,7 @@ class PerformanceCenter:
             twelve_nc: 12NC identifier
 
         Returns:
-            TwelveNCRoomMap object or None if not found
+            TwelveNC object or None if not found
         """
         for mapping in self.nc12_mappings:
             if mapping.twelve_nc == twelve_nc:

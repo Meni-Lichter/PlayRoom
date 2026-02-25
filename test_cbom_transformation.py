@@ -45,13 +45,14 @@ def test_transformed_data(room_mappings, nc12_mappings):
     print_section("TRANSFORMED DATA (Structured Mappings)")
     
     print(f"\nTotal Room Mappings: {len(room_mappings)}")
-    print(f"Total 12NC Mappings: {len(nc12_mappings)}")
+    print(f"\nTotal 12NC Mappings: {len(nc12_mappings)}")
     
-    # Test Room12NCMap objects
-    print("\n--- Sample Room12NCMap Objects (first 3) ---")
+    # Test Room objects
+    print("\n--- Sample Room Objects (first 3) ---")
     for i, room_map in enumerate(room_mappings[:3]):
         print(f"\n[{i+1}] Room Mapping:")
         print(f"  Room: {room_map.room}")
+        print(f"  Description: {room_map.room_description}")
         print(f"  Type: {type(room_map).__name__}")
         print(f"  Number of 12NCs: {len(room_map.twelve_ncs)}")
         print(f"  Total items in room: {room_map.total_items}")
@@ -59,11 +60,12 @@ def test_transformed_data(room_mappings, nc12_mappings):
         for nc, qty in list(room_map.twelve_ncs.items())[:5]:
             print(f"    {nc}: {qty}")
     
-    # Test TwelveNCRoomMap objects
-    print("\n--- Sample TwelveNCRoomMap Objects (first 3) ---")
+    # Test TwelveNC objects
+    print("\n--- Sample TwelveNC Objects (first 3) ---")
     for i, nc_map in enumerate(nc12_mappings[:3]):
         print(f"\n[{i+1}] 12NC Mapping:")
         print(f"  12NC: {nc_map.twelve_nc}")
+        print(f"  Description: {nc_map.tnc_description}")
         print(f"  Type: {type(nc_map).__name__}")
         print(f"  Number of rooms: {len(nc_map.rooms)}")
         print(f"  Total items: {nc_map.total_items}")
@@ -77,7 +79,7 @@ def test_object_methods(room_mappings, nc12_mappings):
     
     if room_mappings:
         room_map = room_mappings[0]
-        print(f"\n--- Testing Room12NCMap methods on Room: {room_map.room} ---")
+        print(f"\n--- Testing Room methods on Room: {room_map.room} ---")
         
         # Test has_12nc
         if room_map.twelve_ncs:
@@ -94,7 +96,7 @@ def test_object_methods(room_mappings, nc12_mappings):
     
     if nc12_mappings:
         nc_map = nc12_mappings[0]
-        print(f"\n--- Testing TwelveNCRoomMap methods on 12NC: {nc_map.twelve_nc} ---")
+        print(f"\n--- Testing TwelveNC methods on 12NC: {nc_map.twelve_nc} ---")
         
         # Test has_room
         if nc_map.rooms:
@@ -175,13 +177,15 @@ def main():
     
     # Step 1: Load CBOM data
     print("\n[Step 1] Loading CBOM data...")
-    room_data, data_12nc = load_cbom(cbom_path, config)
+    room_data, data_12nc, room_descriptions_dict, nc12_descriptions_dict = load_cbom(cbom_path, config)
     
     if room_data is None or data_12nc is None:
         print("\n[ERROR] Failed to load CBOM file")
         return
     
     print("[OK] CBOM data loaded successfully")
+    print(f"[INFO] Loaded {len(room_descriptions_dict)} room descriptions")
+    print(f"[INFO] Loaded {len(nc12_descriptions_dict)} 12NC descriptions")
     
     # Test raw data
     test_raw_data(room_data, data_12nc)
@@ -189,7 +193,13 @@ def main():
     # Step 2: Transform data
     print("\n[Step 2] Transforming CBOM data...")
     try:
-        room_mappings, nc12_mappings = transform_cbom_data(room_data, data_12nc, config)
+        room_mappings, nc12_mappings = transform_cbom_data(
+            room_data, 
+            data_12nc, 
+            room_descriptions_dict,
+            nc12_descriptions_dict,
+            config
+        )
         print("[OK] CBOM data transformed successfully")
     except Exception as e:
         print(f"\n[ERROR] Transformation failed: {e}")

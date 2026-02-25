@@ -7,33 +7,14 @@ from typing import List
 
 import pytest
 import pandas as pd
-import os
 from pathlib import Path
 from datetime import date, datetime
-from dateutil.relativedelta import relativedelta
 from src.models import SalesRecord
 from src.analysis import PerformanceAnalyzer, Predictor
 from src.services import PerformanceCenter
 from src.infrastructure import load_cbom, read_file
 from src.infrastructure.data_transformer import transform_cbom_data
 from src.utils import load_config, normalize_identifier
-
-
-# ============================================================================
-# Test Fixtures
-# ============================================================================
-
-
-@pytest.fixture(scope="session")
-def test_data_dir(tmp_path_factory):
-    """Create a temporary directory for test data files"""
-    return tmp_path_factory.mktemp("test_data")
-
-
-@pytest.fixture(scope="session")
-def config():
-    """Load the actual configuration"""
-    return load_config("config/config.json")
 
 
 # ============================================================================
@@ -333,13 +314,17 @@ def interactive_demo():
     try:
         # Load CBOM
         print("\n📂 Loading CBOM data...")
-        room_data, data_12nc = load_cbom(cbom_path, config)
+        room_data, data_12nc, room_descriptions_dict, nc12_descriptions_dict = load_cbom(
+            cbom_path, config
+        )
 
         if room_data is None or data_12nc is None:
             print("✗ Failed to load CBOM data")
             return
 
-        room_mappings, nc12_mappings = transform_cbom_data(room_data, data_12nc, config)
+        room_mappings, nc12_mappings = transform_cbom_data(
+            room_data, data_12nc, room_descriptions_dict, nc12_descriptions_dict, config
+        )
         print(f"✓ Loaded {len(room_mappings)} room and {len(nc12_mappings)} 12NC MAPPINGS!!!!")
 
         # Load YMBD

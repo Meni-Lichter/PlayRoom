@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class Prediction:
     """Prediction for a future period"""
+
     identifier: str
     type: str
     period_label: str
@@ -10,7 +12,7 @@ class Prediction:
     baseline: float
     buffer_percentage: float
     method: str
-    
+
     @property
     def buffer_amount(self) -> float:
         """Calculate the actual buffer amount"""

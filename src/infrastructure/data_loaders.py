@@ -32,6 +32,8 @@ def load_cbom(cbom_path, config):
     Output:
     - room_data: Dictionary {room_number: DataFrame['12NC (normalized)', '12NC (original)', '12NC_Description', 'Quantity']}
     - data_12nc: Dictionary {12nc_number: DataFrame['Room(normalized)','Room(original)', 'Room_Description', 'Quantity']}
+    - room_descriptions_dict: Dictionary {room_number: room_description}
+    - nc12_descriptions_dict: Dictionary {12nc_number: 12nc_description}
     """
 
     # Get configuration values
@@ -44,7 +46,7 @@ def load_cbom(cbom_path, config):
 
     df = read_file(cbom_path, "cbom", header=None)
     if df is None:
-        return None, None
+        return None, None, None, None
 
     room_col_idx = col_letter_to_index(room_col_start)
     nc12_col_idx = col_letter_to_index(nc12_col)
@@ -68,12 +70,16 @@ def load_cbom(cbom_path, config):
     print(f"\n[CBOM DEBUG] Looking for 12NC {target_12nc} in CBOM file...")
     print(f"[CBOM DEBUG] Total 12NCs in CBOM: {len(nc12_numbers)}")
     print(f"[CBOM DEBUG] First 5 raw 12NC values: {nc12_numbers[:5]}")
-    print(f"[CBOM DEBUG] First 5 values types: {[type(nc12_numbers[i]) for i in range(min(5, len(nc12_numbers)))]}")
-    
+    print(
+        f"[CBOM DEBUG] First 5 values types: {[type(nc12_numbers[i]) for i in range(min(5, len(nc12_numbers)))]}"
+    )
+
     # Check for target considering it might have hyphens (9896-061-30501)
-    target_with_hyphens = f"{target_12nc[:4]}-{target_12nc[4:7]}-{target_12nc[7:]}"  # "9896-061-30501"
+    target_with_hyphens = (
+        f"{target_12nc[:4]}-{target_12nc[4:7]}-{target_12nc[7:]}"  # "9896-061-30501"
+    )
     print(f"[CBOM DEBUG] Also looking for hyphenated format: {target_with_hyphens}")
-    
+
     found_raw = False
     for idx, nc in enumerate(nc12_numbers):
         if pd.isna(nc):
@@ -81,12 +87,16 @@ def load_cbom(cbom_path, config):
         nc_str = str(nc).strip()
         # Check both formats
         if target_12nc in nc_str or target_with_hyphens in nc_str:
-            print(f"[CBOM DEBUG] Found target in raw data at index {idx}: '{nc}' (type: {type(nc)})")
+            print(
+                f"[CBOM DEBUG] Found target in raw data at index {idx}: '{nc}' (type: {type(nc)})"
+            )
             found_raw = True
             break
-    
+
     if not found_raw:
-        print(f"[CBOM DEBUG] Target {target_12nc} (or {target_with_hyphens}) NOT found in raw 12NC data")
+        print(
+            f"[CBOM DEBUG] Target {target_12nc} (or {target_with_hyphens}) NOT found in raw 12NC data"
+        )
 
     # Extract the quantity matrix (from nc12_row_start, room columns onwards)
     quantity_matrix = df.iloc[nc12_row_start_idx:, room_col_idx:].values
@@ -116,7 +126,7 @@ def load_cbom(cbom_path, config):
                 continue
 
             nc12_num_normalized = normalize_identifier(nc12_num)
-            
+
             # DEBUG: Track normalization of target 12NC
             if target_12nc in str(nc12_num) or nc12_num_normalized == target_12nc:
                 print(f"[CBOM DEBUG] Normalizing 12NC: '{nc12_num}' -> '{nc12_num_normalized}'")
@@ -151,6 +161,13 @@ def load_cbom(cbom_path, config):
         # Create DataFrame for this room (use normalized room number as key)
         if room_12ncs:
             room_data[room_num_normalized] = pd.DataFrame(room_12ncs)
+            # Store room's own description
+            room_desc = (
+                str(room_descriptions[room_idx]).strip()
+                if not pd.isna(room_descriptions[room_idx])
+                else ""
+            )
+            room_descriptions_dict[room_num_normalized] = room_desc
 
     ############################
     # Process data for each 12NC
@@ -159,7 +176,7 @@ def load_cbom(cbom_path, config):
     target_found_in_processing = False
     print(f"\n[CBOM DEBUG] Processing 12NCs...")
     print(f"[CBOM DEBUG] First 10 normalized 12NCs:")
-    
+
     for nc12_idx, nc12_num in enumerate(nc12_numbers):
         if pd.isna(nc12_num):
             continue
@@ -167,15 +184,17 @@ def load_cbom(cbom_path, config):
         nc12_num_str = str(nc12_num).strip()
 
         nc12_num_normalized = normalize_identifier(nc12_num_str)
-        
+
         # DEBUG: Show first 10 normalizations
         if nc12_idx < 10:
             print(f"  [{nc12_idx}] '{nc12_num}' -> '{nc12_num_normalized}'")
-        
+
         # DEBUG: Track target 12NC through processing
         if nc12_num_normalized == target_12nc:
             target_found_in_processing = True
-            print(f"[CBOM DEBUG] ✓✓✓ Processing target 12NC: raw='{nc12_num}' normalized='{nc12_num_normalized}'")
+            print(
+                f"[CBOM DEBUG] ✓✓✓ Processing target 12NC: raw='{nc12_num}' normalized='{nc12_num_normalized}'"
+            )
 
         # Validate normalized format (12 digits)
         if not re.match(config["validation"]["patterns"]["12nc_normalized"], nc12_num_normalized):
@@ -219,12 +238,16 @@ def load_cbom(cbom_path, config):
         # Create DataFrame for this 12NC (use normalized 12NC as key)
         if nc12_rooms:
             data_12nc[nc12_num_normalized] = pd.DataFrame(nc12_rooms)
+            # Store 12NC's own description
+            nc12_descriptions_dict[nc12_num_normalized] = nc12_desc
 
     # DEBUG: Final check for target 12NC in mappings
-    print(f"\n[CBOM DEBUG] Target {target_12nc} found during processing: {target_found_in_processing}")
+    print(
+        f"\n[CBOM DEBUG] Target {target_12nc} found during processing: {target_found_in_processing}"
+    )
     print(f"[CBOM DEBUG] Total valid 12NCs processed: {valid_12nc_count}")
     print(f"[CBOM DEBUG] Total 12NCs in data_12nc dict: {len(data_12nc)}")
-    
+
     if target_12nc in data_12nc:
         print(f"[CBOM DEBUG] ✓ Target {target_12nc} IS in data_12nc!")
         rooms_for_target = data_12nc[target_12nc]
@@ -276,7 +299,7 @@ def read_file(path: Path, file_type: str, header=None, converters=None) -> pd.Da
 
         # Prepare converters for specific file types to prevent unwanted type conversions
         converters_dict = converters.copy() if converters else {}
-        
+
         if file_type == "ymbd":
             # Force Component column to be read as string to prevent float conversion
             # which can cause issues like 989606130501 becoming 989606130501.0
@@ -284,11 +307,25 @@ def read_file(path: Path, file_type: str, header=None, converters=None) -> pd.Da
 
         # Read file based on extension
         if ext == ".csv":
-            df = pd.read_csv(path, header=header, converters=converters_dict if converters_dict else None)
+            df = pd.read_csv(
+                path, header=header, converters=converters_dict if converters_dict else None
+            )
         elif ext in [".xlsx", ".xlsm"]:
-            df = pd.read_excel(path, sheet_name=relevant_sheet, header=header, engine="openpyxl", converters=converters_dict if converters_dict else None)
+            df = pd.read_excel(
+                path,
+                sheet_name=relevant_sheet,
+                header=header,
+                engine="openpyxl",
+                converters=converters_dict if converters_dict else None,
+            )
         elif ext in [".xls"]:
-            df = pd.read_excel(path, sheet_name=relevant_sheet, header=header, engine="xlrd", converters=converters_dict if converters_dict else None)
+            df = pd.read_excel(
+                path,
+                sheet_name=relevant_sheet,
+                header=header,
+                engine="xlrd",
+                converters=converters_dict if converters_dict else None,
+            )
             print("read .xls file with pandas")
         else:
             raise ValueError(
