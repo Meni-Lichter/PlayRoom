@@ -1,19 +1,13 @@
 # take loaded data from data_loaders and transform it into the format needed for the application
-from hmac import new
 import re
 from typing import Dict, List
 import pandas as pd
-from pyparsing.diagram import T
-import pandas as pd
-import os
+from datetime import datetime
 
-import logging
 from src.models.mapping import Room, TwelveNC
 from src.models.sales_record import SalesRecord
 from src.utils.config_util import load_config
-from .data_loaders import read_file, load_cbom
 from src.utils.string_utils import normalize_identifier
-from datetime import datetime
 
 
 def transform_cbom_data(
@@ -125,31 +119,37 @@ def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
     raw_match = ymbd_df["Component"].astype(str).str.contains(target_12nc, na=False).any()
     print(f"[YMBD DEBUG] Target {target_12nc} found in raw Component column: {raw_match}")
 
-    # Try multiple date formats
-    date_formats = [
-        "%Y-%m-%d %H:%M:%S",  # 2025-02-28 00:00:00
-        "%Y-%m-%d",  # 2025-02-28
-        "%m-%d-%Y",  # 02-28-2025
-        "%d-%b-%Y",  # 28-Feb-2025
-    ]
+    # Get date format from config
+    config = load_config()
+    date_format = config["ymbd"].get("date_format", "MM-DD-YYYY")
+
+    # Convert format string to strptime format
+    date_format_map = {
+        "MM-DD-YYYY": "%m-%d-%Y",
+        "DD-MMM-YYYY": "%d-%b-%Y",
+        "YYYY-MM-DD": "%Y-%m-%d",
+    }
+    strptime_format = date_format_map.get(date_format, "%m-%d-%Y")
 
     matching_count = 0
     for _, row in ymbd_df.iterrows():
         try:
             date_str = str(row["Confirmed Delivery Date"]).strip()
-            sales_date = None
 
-            # Try each date format
-            for fmt in date_formats:
-                try:
-                    sales_date = datetime.strptime(date_str, fmt).date()
-                    break
-                except ValueError:
+            # Try config format first, then fallbacks (prioritize MM-DD-YYYY)
+            try:
+                sales_date = datetime.strptime(date_str, strptime_format).date()
+            except ValueError:
+                # Fallback formats
+                for fmt in ["%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%b-%Y"]:
+                    try:
+                        sales_date = datetime.strptime(date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    print(f"Warning: Could not parse date '{date_str}', skipping row")
                     continue
-
-            if sales_date is None:
-                print(f"Warning: Could not parse date '{date_str}', skipping row")
-                continue
 
             # Handle Component value - ensure it's properly formatted as a 12-digit string
             component_value = row["Component"]
@@ -206,33 +206,37 @@ def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
 
 
 def parse_fit_cvi_to_sales_records(fit_cvi_df) -> List[SalesRecord]:
-    """Parse FIT_CVI DataFrame to SalesRecord objects"""
+    """Parse FIT_CVI DataFrame to SalesRecord objects using config date format"""
     sales_records = []
 
-    # Try multiple date formats
-    date_formats = [
-        "%Y-%m-%d %H:%M:%S",  # 2025-02-28 00:00:00
-        "%Y-%m-%d",  # 2025-02-28
-        "%d-%b-%Y",  # 28-Feb-2025
-        "%m-%d-%Y",  # 02-28-2025
-    ]
+    # Get date format from config
+    config = load_config()
+    date_format = config["fit_cvi"].get("date_format", "MM-DD-YYYY")  # "DD-MMM-YYYY"
+
+    date_format_map = {
+        "MM-DD-YYYY": "%m-%d-%Y",
+        "DD-MMM-YYYY": "%d-%b-%Y",
+        "YYYY-MM-DD": "%Y-%m-%d",
+    }
+    strptime_format = date_format_map.get(date_format, "%m-%d-%Y")
 
     for _, row in fit_cvi_df.iterrows():
         try:
             date_str = str(row["SD Item\nFSD"]).strip()
-            sales_date = None
 
-            # Try each date format
-            for fmt in date_formats:
-                try:
-                    sales_date = datetime.strptime(date_str, fmt).date()
-                    break
-                except ValueError:
+            try:
+                sales_date = datetime.strptime(date_str, strptime_format).date()
+            except ValueError:
+                # Fallback formats
+                for fmt in ["%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%b-%Y"]:
+                    try:
+                        sales_date = datetime.strptime(date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    print(f"Warning: Could not parse date '{date_str}', skipping row")
                     continue
-
-            if sales_date is None:
-                print(f"Warning: Could not parse date '{date_str}', skipping row")
-                continue
 
             room = str(row["Characteristic\nCharacteristic Name"]).strip()
             quantity = int(row["(Self)\nValue from"])

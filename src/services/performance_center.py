@@ -35,7 +35,7 @@ class PerformanceCenter:
             analyzed_obj: Room or TwelveNC object
             obj_type: Type of the object ("room" or "12nc")
             lookback_years: Number of years of history to analyze
-            granularity: Time granularity ("daily", "weekly", "monthly", "quarterly", "yearly")
+            granularity: Time granularity ("daily", "monthly", "quarterly", "yearly")
 
         Returns:
             PerformanceData object with historical performance
@@ -47,6 +47,7 @@ class PerformanceCenter:
     def predict_room_demand(
         self,
         room: Room,
+        target_time: str | None,
         lookback_years: int = 3,
         method: str = "average",
         buffer_percentage: float = 10.0,
@@ -70,7 +71,9 @@ class PerformanceCenter:
 
         # Then predict based on performance
         predictor = Predictor(performance)
-        return predictor.predict(method=method, buffer_percentage=buffer_percentage)
+        return predictor.predict(
+            target_time=target_time, method=method, buffer_percentage=buffer_percentage
+        )
 
     def predict_12nc_demand(
         self,
