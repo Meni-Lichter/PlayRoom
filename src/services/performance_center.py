@@ -8,28 +8,32 @@ from ..analysis import PerformanceAnalyzer, Predictor
 class PerformanceCenter:
     """High-level API combining all features for Room-12NC Performance Analysis"""
 
-    def __init__(self, sales_data: List[SalesRecord], rooms: List[Room], nc12s: List[TwelveNC]):
+    def __init__(self, rooms: List[Room], nc12s: List[TwelveNC]):
         """
-        Initialize Performance Center with sales data and optional mappings
+        Initialize Performance Center with sales data and CBOM data
 
         Args:
-            sales_data: List of historical sales records
+            sales_data: List of historical sales records coming from ymbd and fit reports
             rooms: List of Room objects (CBOM data)
             nc12s: List of TwelveNC objects (CBOM data)
         """
-        self.sales_data = sales_data
         self.rooms = rooms
         self.nc12s = nc12s
-        self.analyzer = PerformanceAnalyzer(sales_data)
+        self.analyzer = PerformanceAnalyzer()
 
-    def analyze_room_performance(
-        self, room: str, lookback_years: int = 3, granularity: str = "monthly"
+    def analyze_obj_performance(
+        self,
+        analyzed_obj: Room | TwelveNC,
+        obj_type: str = "room",
+        lookback_years: int = 3,
+        granularity: str = "monthly",
     ) -> PerformanceData:
         """
-        Analyze historical performance for a specific room
+        Analyze historical performance for a specific object (Room or TwelveNC)
 
         Args:
-            room: Room identifier
+            analyzed_obj: Room or TwelveNC object
+            obj_type: Type of the object ("room" or "12nc")
             lookback_years: Number of years of history to analyze
             granularity: Time granularity ("daily", "weekly", "monthly", "quarterly", "yearly")
 
@@ -37,30 +41,12 @@ class PerformanceCenter:
             PerformanceData object with historical performance
         """
         return self.analyzer.analyze(
-            room, id_type="room", lookback_years=lookback_years, granularity=granularity
-        )
-
-    def analyze_12nc_performance(
-        self, twelve_nc: str, lookback_years: int = 3, granularity: str = "monthly"
-    ) -> PerformanceData:
-        """
-        Analyze historical performance for a specific 12NC
-
-        Args:
-            twelve_nc: 12NC identifier
-            lookback_years: Number of years of history to analyze
-            granularity: Time granularity
-
-        Returns:
-            PerformanceData object with historical performance
-        """
-        return self.analyzer.analyze(
-            twelve_nc, id_type="12nc", lookback_years=lookback_years, granularity=granularity
+            analyzed_obj, obj_type=obj_type, lookback_years=lookback_years, granularity=granularity
         )
 
     def predict_room_demand(
         self,
-        room: str,
+        room: Room,
         lookback_years: int = 3,
         method: str = "average",
         buffer_percentage: float = 10.0,
@@ -78,7 +64,9 @@ class PerformanceCenter:
             Prediction object with forecasted demand
         """
         # First analyze historical performance
-        performance = self.analyze_room_performance(room, lookback_years)
+        performance = self.analyze_obj_performance(
+            room, obj_type="room", lookback_years=lookback_years
+        )
 
         # Then predict based on performance
         predictor = Predictor(performance)
@@ -86,7 +74,7 @@ class PerformanceCenter:
 
     def predict_12nc_demand(
         self,
-        twelve_nc: str,
+        twelve_nc: TwelveNC,
         lookback_years: int = 3,
         method: str = "average",
         buffer_percentage: float = 10.0,

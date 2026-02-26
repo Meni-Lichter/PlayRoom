@@ -80,13 +80,13 @@ class Predictor:
         else:
             return "monthly"
 
-    def _extract_month_year(self, period_label: str) -> Optional[tuple[int, int]]:
-        """Extract month and year from period label
+    def _extract_date_parts(self, period_label: str) -> Optional[tuple[int, int]]:
+        """Extract all date parts from date label - year, quarter, month, week, day as applicable
         Args:
             period_label: Period label (e.g., '2024-03', '2024-Q1', '2024')
 
         Returns:
-            Tuple of (month, year) or None if not applicable
+            Array pf all data parts from year to day
         """
         try:
             if "-W" in period_label:
@@ -131,23 +131,43 @@ class Predictor:
         """
         granularity = self._infer_granularity()
         next_period = get_next_period_label(granularity)
-        next_period_info = self._extract_month_year(next_period)
 
+        if granularity == "yearly":
+            # For yearly, average the last n years
+            recent = self.performance_data.periods[-n_years:]
+            return (
+                sum(p.quantity for p in recent) / len(recent)
+                if recent
+                else self.performance_data.average
+            )
+
+        next_period_info = self._extract_date_parts(next_period)
         if next_period_info is None:
-            # Fallback to overall average for yearly granularity
             return self.performance_data.average
 
-        target_month, _ = next_period_info
+        target_month, target_year = next_period_info
         matching_periods = []
 
-        # Look back through historical periods to find matches for the same month in previous years
-        for period in self.performance_data.periods[-n_years:]:
-            period_info = self._extract_month_year(period.label)
-            if period_info and period_info[0] == target_month:
+        # For weekly/daily: also match the specific week/day, not just month
+        for period in self.performance_data.periods:
+            period_info = self._extract_date_parts(period.label)
+            if not period_info:
+                continue
+
+            month, year = period_info
+
+            # Match same month from previous n years
+            if month == target_month and (target_year - n_years <= year < target_year):
+                # For weekly/daily, add additional filtering here
+                if granularity == "weekly":
+                    # Extract and compare week numbers
+                    pass
+                elif granularity == "daily":
+                    # Extract and compare day numbers
+                    pass
                 matching_periods.append(float(period.quantity))
 
         if not matching_periods:
-            # Fallback to overall average if no matching periods found
             return self.performance_data.average
 
         return sum(matching_periods) / len(matching_periods)

@@ -1,4 +1,5 @@
 """Date utility functions for period key generation and next period labeling"""
+
 import calendar
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
@@ -29,7 +30,7 @@ def get_period_key(dt: date, granularity: str) -> str:
 def get_next_period_label(granularity: str) -> str:
     """Generate label for next period"""
     now = datetime.now()
-    
+
     if granularity == "monthly":
         next_month = now + relativedelta(months=1)
         return next_month.strftime("%Y-%m")
@@ -46,4 +47,3 @@ def get_next_period_label(granularity: str) -> str:
     else:
         next_day = now + relativedelta(days=1)
         return next_day.strftime("%Y-%m-%d")
-
