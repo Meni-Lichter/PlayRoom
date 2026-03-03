@@ -121,7 +121,9 @@ def parse_ymbd_to_sales_records(tnc_list: List[TwelveNC], ymbd_df) -> List[Twelv
         "YYYY-MM-DD": "%Y-%m-%d",
     }
     strptime_format = date_format_map.get(date_format, "%m-%d-%Y")
-
+    print(
+        f"Parsing YMBD data with date format '{date_format}' using strptime format '{strptime_format}'"
+    )
     # Step 1: Build ymbd dictionary {12NC: [(date, qty), ...]} - O(n)
     ymbd_dict = {}
     skipped = 0
@@ -261,6 +263,7 @@ def parse_fit_cvi_to_sales_records(room_list: List[Room], fit_cvi_df) -> List[Ro
                     quantity=quantity,  # Room-level quantity applies to all components
                     date=sales_date,
                 )
+                print(f"updated wit date {sales_date.strftime('%m-%d-%Y')} and quantity {quantity}")
                 room.sales_history.append(sales_record)
                 total_records += 1
 

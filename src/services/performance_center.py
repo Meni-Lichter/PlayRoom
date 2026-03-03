@@ -1,6 +1,8 @@
 """Performance Center - High-level service orchestrating all features"""
 
 from typing import List, Dict
+
+from src.utils.date_utils import _infer_granularity
 from ..models import PerformanceData, Prediction, Room, TwelveNC, G_entity
 from ..analysis import PerformanceAnalyzer, Predictor
 
@@ -62,8 +64,11 @@ class PerformanceCenter:
         Returns:
             Prediction object with forecasted demand
         """
+        granularity = _infer_granularity(target_time)
         # First analyze historical performance
-        performance = self.analyze_obj_performance(entity, lookback_years=lookback_years)
+        performance = self.analyze_entity_performance(
+            entity, lookback_years=lookback_years, granularity=granularity
+        )
 
         # Then predict based on performance
         predictor = Predictor(performance)

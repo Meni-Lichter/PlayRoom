@@ -29,8 +29,7 @@ class Predictor:
 
         Args:
             target_time: Target period label for prediction (e.g., '2024-03', '2024-Q1', '2024')
-            method: Prediction method ("average", "last", "trend",
-                    "avg_same_period_previous_years", "avg_last_n_periods", "same_period_last_year")
+            method: Prediction method ("avg_same_period_previous_years", "avg_last_n_periods")
             buffer_percentage: Safety buffer percentage to add
             n_periods: Number of periods to average (only used for "avg_last_n_periods" method)
 
