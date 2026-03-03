@@ -30,8 +30,8 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
     - config: Configuration dictionary with CBOM structure settings
 
     Output:
-    - room_data: Dictionary {room_number:  tncs['12NC (normalized)', '12NC (original)', '12NC_Description', 'Quantity']}}
-    - data_12nc: Dictionary {12nc_number:  rooms['Room(normalized)','Room(original)', 'Room_Description', 'Quantity']}}
+    - room_data: Dictionary {room_number: room_description, tncs['12NC (normalized)', '12NC (original)', '12NC_Description', 'Quantity']}}
+    - data_12nc: Dictionary {12nc_number:  12nc_description, IGT 12NC, rooms['Room(normalized)','Room(original)', 'Room_Description', 'Quantity']}}
     """
 
     # Initialize dictionaries to hold data
@@ -70,39 +70,6 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
     nc12_descriptions = df.iloc[nc12_row_start_idx:, nc12_desc_col_idx].values
     nc12_igts = df.iloc[nc12_row_start_idx:, nc12_igt_col_idx].values
 
-    # DEBUG: Check for target 12NC in raw CBOM data
-    target_12nc = "989606130501"
-    print(f"\n[CBOM DEBUG] Looking for 12NC {target_12nc} in CBOM file...")
-    print(f"[CBOM DEBUG] Total 12NCs in CBOM: {len(nc12_numbers)}")
-    print(f"[CBOM DEBUG] First 5 raw 12NC values: {nc12_numbers[:5]}")
-    print(
-        f"[CBOM DEBUG] First 5 values types: {[type(nc12_numbers[i]) for i in range(min(5, len(nc12_numbers)))]}"
-    )
-
-    # Check for target considering it might have hyphens (9896-061-30501)
-    target_with_hyphens = (
-        f"{target_12nc[:4]}-{target_12nc[4:7]}-{target_12nc[7:]}"  # "9896-061-30501"
-    )
-    print(f"[CBOM DEBUG] Also looking for hyphenated format: {target_with_hyphens}")
-
-    found_raw = False
-    for idx, nc in enumerate(nc12_numbers):
-        if pd.isna(nc):
-            continue
-        nc_str = str(nc).strip()
-        # Check both formats
-        if target_12nc in nc_str or target_with_hyphens in nc_str:
-            print(
-                f"[CBOM DEBUG] Found target in raw data at index {idx}: '{nc}' (type: {type(nc)})"
-            )
-            found_raw = True
-            break
-
-    if not found_raw:
-        print(
-            f"[CBOM DEBUG] Target {target_12nc} (or {target_with_hyphens}) NOT found in raw 12NC data"
-        )
-
     # Extract the quantity matrix (from nc12_row_start, room columns onwards)
     quantity_matrix = df.iloc[nc12_row_start_idx:, room_col_idx:].values
 
@@ -110,14 +77,15 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
     # Process data for each room
     ############################
     valid_room_count = 0
-
+    seen_rooms = set()
+    print(f"\n[CBOM DEBUG] Processing rooms...")
     for room_idx, room_num in enumerate(room_numbers):
         if pd.isna(room_num):
             continue
 
-        room_num_normalized = normalize_identifier(room_num)
+        room_num_normalized = normalize_identifier(room_num)  # dict key
 
-        room_description = (
+        room_description = (  # value to store in room_data for this room
             str(room_descriptions[room_idx]).strip()
             if not pd.isna(room_descriptions[room_idx])
             else ""
@@ -128,6 +96,14 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
         ):  # Validate normalized room format (e.g., "ROOM123")
             continue
 
+        # Check for duplicates
+        if room_num_normalized not in seen_rooms:
+            print(f"[CBOM DEBUG] {room_num_normalized}: {room_description}")
+            seen_rooms.add(room_num_normalized)
+        else:
+            print(f"[CBOM DEBUG] Duplicate room found: {room_num_normalized}")
+            continue
+
         valid_room_count += 1
         # Collect all 12NCs for this room
         room_12ncs = []
@@ -136,10 +112,6 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
                 continue
 
             nc12_num_normalized = normalize_identifier(nc12_num)
-
-            # DEBUG: Track normalization of target 12NC
-            if target_12nc in str(nc12_num) or nc12_num_normalized == target_12nc:
-                print(f"[CBOM DEBUG] Normalizing 12NC: '{nc12_num}' -> '{nc12_num_normalized}'")
 
             # Validate normalized format (12 digits)
             if (
@@ -164,9 +136,6 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
             room_12ncs.append(
                 {
                     "12NC": nc12_num_normalized,  # Store normalized version
-                    "12NC_IGT": nc12_igt,  # Store IGT 12NC if available
-                    "12NC_Original": str(nc12_num).strip(),  # Keep original for reference
-                    "12NC_Description": nc12_desc,
                     "Quantity": quantity,
                 }
             )
@@ -182,9 +151,9 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
     # Process data for each 12NC
     ############################
     valid_12nc_count = 0
-    target_found_in_processing = False
     print(f"\n[CBOM DEBUG] Processing 12NCs...")
     print(f"[CBOM DEBUG] First 10 normalized 12NCs:")
+    seen_12ncs = set()
 
     for nc12_idx, nc12_num in enumerate(nc12_numbers):
         if pd.isna(nc12_num):
@@ -192,32 +161,31 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
 
         nc12_num_str = str(nc12_num).strip()
 
-        nc12_num_normalized = normalize_identifier(nc12_num_str)
-
-        # DEBUG: Show first 10 normalizations
-        if nc12_idx < 10:
-            print(f"  [{nc12_idx}] '{nc12_num}' -> '{nc12_num_normalized}'")
-
-        # DEBUG: Track target 12NC through processing
-        if nc12_num_normalized == target_12nc:
-            target_found_in_processing = True
-            print(
-                f"[CBOM DEBUG] ✓✓✓ Processing target 12NC: raw='{nc12_num}' normalized='{nc12_num_normalized}'"
-            )
+        nc12_num_normalized = normalize_identifier(nc12_num_str)  # dict key
 
         # Validate normalized format (12 digits)
         if not re.match(config["validation"]["patterns"]["12nc_normalized"], nc12_num_normalized):
             continue
 
+        # Check for duplicates
+        if nc12_num_normalized not in seen_12ncs:
+            print(f"[CBOM DEBUG] {nc12_num_normalized}")
+            seen_12ncs.add(nc12_num_normalized)
+        else:
+            print(f"[CBOM DEBUG] Duplicate 12NC found: {nc12_num_normalized}")
+            continue
+
         valid_12nc_count += 1
 
         # Get 12NC description and IGT
-        nc12_desc = (
+        nc12_desc = (  # value to store in data_12nc for this 12NC
             str(nc12_descriptions[nc12_idx]).strip()
             if not pd.isna(nc12_descriptions[nc12_idx])
             else ""
         )
-        nc12_igt = str(nc12_igts[nc12_idx]).strip() if not pd.isna(nc12_igts[nc12_idx]) else ""
+        nc12_igt = (
+            str(nc12_igts[nc12_idx]).strip() if not pd.isna(nc12_igts[nc12_idx]) else ""
+        )  # Store IGT 12NC if available
 
         # Collect all rooms for this 12NC
         nc12_rooms = []
@@ -243,8 +211,6 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
             nc12_rooms.append(
                 {
                     "Room": room_num_normalized,  # Store normalized version
-                    "Room_Original": str(room_num).strip(),  # Keep original for reference
-                    "Room_Description": room_desc,
                     "Quantity": quantity,
                 }
             )
@@ -256,21 +222,6 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
                 "12NC_IGT": nc12_igt,
                 "room_list": pd.DataFrame(nc12_rooms),
             }
-
-    # DEBUG: Final check for target 12NC in mappings
-    print(
-        f"\n[CBOM DEBUG] Target {target_12nc} found during processing: {target_found_in_processing}"
-    )
-    print(f"[CBOM DEBUG] Total valid 12NCs processed: {valid_12nc_count}")
-    print(f"[CBOM DEBUG] Total 12NCs in data_12nc dict: {len(data_12nc)}")
-
-    if target_12nc in data_12nc:
-        print(f"[CBOM DEBUG] ✓ Target {target_12nc} IS in data_12nc!")
-        rooms_for_target = data_12nc[target_12nc]
-        print(f"[CBOM DEBUG] Rooms for {target_12nc}: {list(rooms_for_target['Room'].values)}")
-    else:
-        print(f"[CBOM DEBUG] ✗ Target {target_12nc} NOT in data_12nc")
-        print(f"[CBOM DEBUG] Sample keys in data_12nc (first 10): {list(data_12nc.keys())[:10]}")
 
     return room_data, data_12nc
 

@@ -17,7 +17,7 @@ def transform_cbom_data(
 
     input:
     - room_data: dict with room numbers as keys and dicts containing {'description': str, '12ncs': DataFrame}
-    - data_12nc: dict with 12NCs as keys and dicts containing {'description': str, 'rooms': DataFrame}
+    - data_12nc: dict with 12NCs as keys and dicts containing {'description': str, 'IGT_12NC': str, 'rooms': DataFrame}
     - config: configuration dictionary for validation patterns
 
     output:
@@ -29,14 +29,21 @@ def transform_cbom_data(
 
     rooms: List[Room] = []
     nc12s: List[TwelveNC] = []
+    #####################
+    # populate rooms list
+    ####################
+    for room in room_data.keys():
+        if not re.match(config["validation"]["patterns"]["room_normalized"], str(room)):
+            print(f"Warning: Room '{room}' does not match expected format. Skipping.")
+            continue
 
-    # Fix: twelve_ncs should be Dict[str, int] not Dict[TwelveNC, int]
-    for room, room_df in room_data.items():
+        # Get description from first row if available
+        description = room_data[room]["description"] if "description" in room_data[room] else ""
+
         twelve_ncs_dict = {}  # Not Dict[TwelveNC, int]
-
-        # Convert DataFrame rows to dict entries
-        for idx, row in room_df.iterrows():
-            # Skip rows with invalid quantities
+        # Skip rows with invalid quantities
+        tnc_list = room_data[room]["tnc_list"]
+        for _, row in tnc_list.iterrows():
             qty_value = str(row["Quantity"]).strip()
             if qty_value and qty_value not in ["", "nan", "None"] and not pd.isna(row["Quantity"]):
                 try:
@@ -47,9 +54,6 @@ def transform_cbom_data(
                     )
                     continue
 
-        # Get description from first row if available
-        description = room_df["Room_Description"].iloc[0] if len(room_df) > 0 else ""
-        
         rooms.append(
             Room(
                 id=room,
@@ -58,44 +62,28 @@ def transform_cbom_data(
                 sales_history=[],
             )
         )
+    ################################
+    # populate nc12s list
+    ################################
+    for nc12 in data_12nc.keys():
 
-    # Validate and transform 12NC data
-    target_12nc = "989606130501"
-    print(f"\n[TRANSFORM DEBUG] Transforming 12NC data...")
-    print(f"[TRANSFORM DEBUG] Looking for {target_12nc} in data_12nc...")
-    print(f"[TRANSFORM DEBUG] Total 12NCs in data_12nc: {len(data_12nc)}")
-
-    if target_12nc in data_12nc:
-        print(f"[TRANSFORM DEBUG] ✓ Found {target_12nc} in data_12nc")
-    else:
-        print(f"[TRANSFORM DEBUG] ✗ {target_12nc} NOT in data_12nc")
-        print(f"[TRANSFORM DEBUG] Sample keys (first 10): {list(data_12nc.keys())[:10]}")
-
-    for nc12, nc12_df in data_12nc.items():
         if not re.match(config["validation"]["patterns"]["12nc_normalized"], str(nc12)):
             print(f"Warning: 12NC '{nc12}' does not match expected format. Skipping.")
             continue
+        description = (
+            data_12nc[nc12]["12NC_Description"] if "12NC_Description" in data_12nc[nc12] else ""
+        )
+        igt = data_12nc[nc12]["IGT_12NC"] if "IGT_12NC" in data_12nc[nc12] else ""
 
-        # DEBUG: Track target through transformation
-        if nc12 == target_12nc:
-            print(f"[TRANSFORM DEBUG] Processing {target_12nc}...")
-            print(f"[TRANSFORM DEBUG] nc12_df type: {type(nc12_df)}")
-            print(f"[TRANSFORM DEBUG] nc12_df shape: {nc12_df.shape}")
-            print(f"[TRANSFORM DEBUG] nc12_df columns: {nc12_df.columns.tolist()}")
+        room_dict = {}  # Not Dict[Room, int]
 
-        # Get description and IGT from first row if available
-        description = nc12_df["12NC_Description"].iloc[0] if len(nc12_df) > 0 else ""
-        igt = nc12_df["12NC_IGT"].iloc[0] if len(nc12_df) > 0 else ""
-        
-        # Validate rooms and convert quantities to integers
-        valid_rooms = {}
-        # Convert DataFrame rows to dict entries
-        for idx, row in nc12_df.iterrows():
-            # Skip rows with invalid quantities
+        room_list = data_12nc[nc12]["room_list"]
+
+        for _, row in room_list.iterrows():
             qty_value = str(row["Quantity"]).strip()
             if qty_value and qty_value not in ["", "nan", "None"] and not pd.isna(row["Quantity"]):
                 try:
-                    valid_rooms[row["Room"]] = int(float(qty_value))
+                    room_dict[row["Room"]] = int(float(qty_value))
                 except (ValueError, TypeError):
                     print(
                         f"Warning: Invalid quantity '{qty_value}' for room {row['Room']} in 12NC {nc12}. Skipping."
@@ -107,20 +95,10 @@ def transform_cbom_data(
                 id=nc12,
                 description=description,
                 igt=igt,
-                componenets=valid_rooms,
+                componenets=room_dict,
                 sales_history=[],
             )
         )
-
-        # DEBUG: Confirm target was added
-        if nc12 == target_12nc:
-            print(f"[TRANSFORM DEBUG] ✓ Added {target_12nc} to nc12s with {len(valid_rooms)} rooms")
-
-    # DEBUG: Final check
-    print(f"\n[TRANSFORM DEBUG] Transformation complete")
-    print(f"[TRANSFORM DEBUG] Total nc12s created: {len(nc12s)}")
-    target_in_mappings = any(m.twelve_nc == target_12nc for m in nc12s)
-    print(f"[TRANSFORM DEBUG] Target {target_12nc} in final nc12s: {target_in_mappings}")
 
     return rooms, nc12s
 

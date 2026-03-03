@@ -272,67 +272,61 @@ class TestDataTransformers:
         print("🧪 TEST: CBOM Data Transformation")
         print("=" * 80)
 
-        # Load CBOM data first
+        # Load and transform CBOM
         print("\n📥 Loading CBOM...")
         room_data, data_12nc = load_cbom(cbom_file, config)
         print(f"  ✓ Loaded {len(room_data)} rooms, {len(data_12nc)} 12NCs")
 
-        # Transform data
         print("\n🔄 Transforming data...")
         start_time = time.perf_counter()
-
         rooms, nc12s = transform_cbom_data(room_data, data_12nc, config)
+        transform_time = (time.perf_counter() - start_time) * 1000
 
-        end_time = time.perf_counter()
-        transform_time = (end_time - start_time) * 1000
+        # Validation
+        assert rooms and nc12s, "Should create rooms and 12NCs"
+        assert all(isinstance(r, Room) for r in rooms), "All should be Room objects"
+        assert all(isinstance(nc, TwelveNC) for nc in nc12s), "All should be TwelveNC objects"
+        assert all(r.id for r in rooms), "All rooms should have IDs"
+        assert all(
+            nc.id and len(nc.id) == 12 for nc in nc12s
+        ), "All 12NCs should have valid 12-digit IDs"
 
-        # Assertions
-        assert rooms is not None, "rooms should not be None"
-        assert nc12s is not None, "nc12s should not be None"
-        assert isinstance(rooms, list), "rooms should be a list"
-        assert isinstance(nc12s, list), "nc12s should be a list"
-        assert len(rooms) > 0, "Should create at least one room"
-        assert len(nc12s) > 0, "Should create at least one 12NC"
-        assert all(isinstance(r, Room) for r in rooms), "All items should be Room objects"
-        assert all(isinstance(nc, TwelveNC) for nc in nc12s), "All items should be TwelveNC objects"
-
-        # Performance metrics
-        total_objects = len(rooms) + len(nc12s)
-        throughput = total_objects / (transform_time / 1000) if transform_time > 0 else 0
-
+        # Metrics
         print(f"\n✓ CBOM data transformed successfully")
         print(f"  - Transform time: {transform_time:.2f} ms")
-        print(f"  - Room objects created: {len(rooms):,}")
-        print(f"  - TwelveNC objects created: {len(nc12s):,}")
-        print(f"  - Throughput: {throughput:.2f} objects/sec")
+        print(f"  - Room objects created: {len(rooms)}")
+        print(f"  - TwelveNC objects created: {len(nc12s)}")
+        print(
+            f"  - Throughput: {(len(rooms) + len(nc12s)) / (transform_time / 1000):.2f} objects/sec"
+        )
 
-        # Validate structure
+        # Sample data
         print(f"\n📦 Sample Room Object:")
-        sample_room = rooms[0]
-        print(f"  - Room ID: {sample_room.id}")
-        desc = sample_room.description
-        print(f"  - Description: {desc[:50]}..." if len(desc) > 50 else f"  - Description: {desc}")
-        print(f"  - Components: {len(sample_room.twelve_ncs)}")
-        print(f"  - Total items: {sample_room.total_items}")
+        r = rooms[0]
+        print(f"  - Room ID: {r.id}")
+        print(
+            f"  - Description: {r.description[:50]}..."
+            if len(r.description) > 50
+            else f"  - Description: {r.description}"
+        )
+        print(f"  - Components: {len(r.twelve_ncs)}")
+        print(f"  - Total items: {r.total_items}")
 
         print(f"\n🔢 Sample 12NC Object:")
-        sample_12nc = nc12s[0]
-        print(f"  - 12NC ID: {sample_12nc.id}")
-        desc = sample_12nc.description
-        print(f"  - Description: {desc[:50]}..." if len(desc) > 50 else f"  - Description: {desc}")
-        print(f"  - IGT: {sample_12nc.igt}")
-        print(f"  - Rooms: {len(sample_12nc.rooms)}")
-        print(f"  - Total items: {sample_12nc.total_items}")
+        nc = nc12s[0]
+        print(f"  - 12NC ID: {nc.id}")
+        print(
+            f"  - Description: {nc.description[:50]}..."
+            if len(nc.description) > 50
+            else f"  - Description: {nc.description}"
+        )
+        print(f"  - IGT: {nc.igt}")
+        print(f"  - Rooms: {len(nc.rooms)}")
+        print(f"  - Total items: {nc.total_items}")
 
-        # Validation checks
         print(f"\n🔍 Validation:")
-        invalid_room_ids = [r for r in rooms if not r.id]
-        invalid_12ncs = [nc for nc in nc12s if not nc.id or len(nc.id) != 12]
-        print(f"  ✓ Rooms with valid IDs: {len(rooms) - len(invalid_room_ids)}/{len(rooms)}")
-        print(f"  ✓ 12NCs with valid IDs: {len(nc12s) - len(invalid_12ncs)}/{len(nc12s)}")
-
-        assert len(invalid_room_ids) == 0, "All rooms should have IDs"
-        assert len(invalid_12ncs) == 0, "All 12NCs should have valid 12-digit IDs"
+        print(f"  ✓ Rooms with valid IDs: {len(rooms)}/{len(rooms)}")
+        print(f"  ✓ 12NCs with valid IDs: {len(nc12s)}/{len(nc12s)}")
 
         print("\n" + "=" * 80)
 
@@ -345,76 +339,68 @@ class TestDataTransformers:
         print("🧪 TEST: YMBD Sales Record Parsing")
         print("=" * 80)
 
-        # Setup: Load and transform CBOM first
+        # Setup: Load and transform CBOM
         print("\n📥 Setup: Loading CBOM...")
         room_data, data_12nc = load_cbom(cbom_file, config)
         rooms, nc12s = transform_cbom_data(room_data, data_12nc, config)
         print(f"  ✓ Created {len(nc12s)} 12NC objects")
 
-        # Load YMBD data
+        # Load and parse YMBD data
         print("\n📥 Loading YMBD...")
         ymbd_df = read_file(ymbd_file, "ymbd", header=0)
         print(f"  ✓ Loaded {len(pd.DataFrame(ymbd_df))} YMBD rows")
 
-        # Parse YMBD and update 12NCs
         print("\n🔄 Parsing YMBD to sales records...")
         start_time = time.perf_counter()
-
         updated_nc12s = parse_ymbd_to_sales_records(nc12s, ymbd_df)
-
-        end_time = time.perf_counter()
-        parse_time = (end_time - start_time) * 1000
+        parse_time = (time.perf_counter() - start_time) * 1000
 
         # Assertions
         assert updated_nc12s is not None, "Should not return None"
         assert len(updated_nc12s) == len(nc12s), "Should return same number of 12NCs"
 
-        # Count 12NCs with sales data
+        # Metrics
         nc12s_with_sales = [nc for nc in updated_nc12s if len(nc.sales_history) > 0]
-        total_sales_records = sum(len(nc.sales_history) for nc in updated_nc12s)
-
-        # Performance metrics
-        throughput = len(pd.DataFrame(ymbd_df)) / (parse_time / 1000) if parse_time > 0 else 0
+        total_sales = sum(len(nc.sales_history) for nc in updated_nc12s)
 
         print(f"\n✓ YMBD data parsed successfully")
         print(f"  - Parse time: {parse_time:.2f} ms")
         print(f"  - 12NCs updated: {len(nc12s_with_sales)}/{len(nc12s)}")
-        print(f"  - Total sales records: {total_sales_records:,}")
+        print(f"  - Total sales records: {total_sales:,}")
         if nc12s_with_sales:
-            print(f"  - Avg records per 12NC: {total_sales_records/len(nc12s_with_sales):.1f}")
-        print(f"  - Throughput: {throughput:.2f} rows/sec")
+            print(f"  - Avg records per 12NC: {total_sales/len(nc12s_with_sales):.1f}")
+        print(f"  - Throughput: {len(pd.DataFrame(ymbd_df)) / (parse_time / 1000):.2f} rows/sec")
 
-        # Coverage analysis
+        # Coverage
         coverage = (len(nc12s_with_sales) / len(nc12s) * 100) if nc12s else 0
         print(f"\n📊 Coverage Analysis:")
         print(f"  - Match rate: {coverage:.1f}%")
         print(f"  - Matched: {len(nc12s_with_sales)}")
         print(f"  - Unmatched: {len(nc12s) - len(nc12s_with_sales)}")
 
-        # Sample sales data
+        # Validation
         if nc12s_with_sales:
-            print(f"\n💰 Sample Sales Data:")
             sample = nc12s_with_sales[0]
+            print(f"\n💰 Sample Sales Data:")
             print(f"  - 12NC: {sample.id}")
             print(f"  - Sales records: {len(sample.sales_history)}")
             if sample.sales_history:
                 sr = sample.sales_history[0]
                 print(f"    └─ Date: {sr.date}, Qty: {sr.quantity}")
 
-            # Validate sales records
-            for nc in nc12s_with_sales[:5]:  # Check first 5
+            # Validate first 5
+            for nc in nc12s_with_sales[:5]:
                 for record in nc.sales_history:
                     assert isinstance(record, SalesRecord), "Should be SalesRecord object"
-                    assert hasattr(record, "date"), "Record should have date"
-                    assert hasattr(record, "quantity"), "Record should have quantity"
+                    assert hasattr(record, "date") and record.date, "Should have date"
                     assert (
-                        record.quantity > 0
-                    ), f"Quantity should be positive, got {record.quantity}"
+                        hasattr(record, "quantity") and record.quantity > 0
+                    ), "Should have positive quantity"
 
         print("\n" + "=" * 80)
 
     def test_parse_fit_cvi_to_sales_records(self, cbom_file, fit_file, config):
-        """Test FIT/CVI parsing to SalesRecord objects"""
+        """Test FIT/CVI parsing and linking to Room objects"""
         if not cbom_file or not fit_file:
             pytest.skip("Need both CBOM and FIT/CVI files")
 
@@ -428,59 +414,54 @@ class TestDataTransformers:
         rooms, nc12s = transform_cbom_data(room_data, data_12nc, config)
         print(f"  ✓ Created {len(rooms)} room objects")
 
-        # Load FIT/CVI data
+        # Load and parse FIT/CVI data
         print("\n📥 Loading FIT/CVI...")
         fit_df = read_file(fit_file, "fit_cvi", header=0)
         print(f"  ✓ Loaded {len(pd.DataFrame(fit_df))} FIT/CVI rows")
 
-        # Parse FIT/CVI
         print("\n🔄 Parsing FIT/CVI to sales records...")
         start_time = time.perf_counter()
-
-        sales_records = parse_fit_cvi_to_sales_records(rooms, fit_df)
-
+        updated_rooms = parse_fit_cvi_to_sales_records(rooms, fit_df)
         end_time = time.perf_counter()
         parse_time = (end_time - start_time) * 1000
 
         # Assertions
-        assert sales_records is not None, "Should not return None"
-        assert isinstance(sales_records, list), "Should return a list"
+        assert updated_rooms is not None, "Should not return None"
+        assert len(updated_rooms) == len(rooms), "Should return same number of rooms"
         assert all(
-            isinstance(sr, SalesRecord) for sr in sales_records
-        ), "All items should be SalesRecord objects"
+            isinstance(room, Room) for room in updated_rooms
+        ), "All items should be Room objects"
 
-        # Performance metrics
+        # Extract all sales records from rooms
+        all_sales_records = []
+        for room in updated_rooms:
+            all_sales_records.extend(room.sales_history)
+
+        # Metrics
+        rooms_with_sales = [r for r in updated_rooms if len(r.sales_history) > 0]
         throughput = len(pd.DataFrame(fit_df)) / (parse_time / 1000) if parse_time > 0 else 0
 
         print(f"\n✓ FIT/CVI data parsed successfully")
         print(f"  - Parse time: {parse_time:.2f} ms")
-        print(f"  - Sales records created: {len(sales_records):,}")
+        print(f"  - Rooms updated: {len(rooms_with_sales)}/{len(updated_rooms)}")
+        print(f"  - Total sales records: {len(all_sales_records):,}")
         print(f"  - Throughput: {throughput:.2f} rows/sec")
 
-        # Data summary
-        if sales_records:
-            total_qty = sum(sr.quantity for sr in sales_records)
-            unique_rooms = len(set(sr.identifier for sr in sales_records))
-            unique_dates = len(set(sr.date for sr in sales_records))
+        # Validation
+        if all_sales_records:
+            assert all(
+                isinstance(sr, SalesRecord) for sr in all_sales_records
+            ), "All should be SalesRecord objects"
+            assert all(
+                hasattr(sr, "date") and sr.date for sr in all_sales_records[:10]
+            ), "Records should have dates"
+            assert all(
+                sr.quantity > 0 for sr in all_sales_records[:10]
+            ), "Quantities should be positive"
 
-            print(f"\n📊 Data Summary:")
-            print(f"  - Total quantity: {total_qty:,}")
-            print(f"  - Unique rooms: {unique_rooms}")
-            print(f"  - Unique dates: {unique_dates}")
-            print(f"  - Avg qty/record: {total_qty/len(sales_records):.1f}")
-
-            print(f"\n💰 Sample Sales Record:")
-            sr = sales_records[0]
-            print(f"  - Room: {sr.identifier}")
-            print(f"  - Date: {sr.date}")
-            print(f"  - Quantity: {sr.quantity}")
-
-            # Validate
-            for record in sales_records[:10]:  # Check first 10
-                assert hasattr(record, "identifier"), "Record should have identifier"
-                assert hasattr(record, "date"), "Record should have date"
-                assert hasattr(record, "quantity"), "Record should have quantity"
-                assert record.quantity > 0, f"Quantity should be positive, got {record.quantity}"
+            print(f"\n📊 Validation:")
+            print(f"  ✓ All sales records valid")
+            print(f"  ✓ Avg records/room: {len(all_sales_records)/len(rooms_with_sales):.1f}")
 
         print("\n" + "=" * 80)
 
@@ -510,6 +491,14 @@ class TestIntegration:
         rooms, nc12s = transform_cbom_data(room_data, data_12nc, config)
         print(f"   ✓ Created {len(rooms)} rooms and {len(nc12s)} 12NCs")
 
+        # Validate CBOM objects
+        assert all(isinstance(r, Room) for r in rooms), "All rooms should be Room objects"
+        assert all(isinstance(nc, TwelveNC) for nc in nc12s), "All 12NCs should be TwelveNC objects"
+        assert all(r.id for r in rooms), "All rooms should have IDs"
+        assert all(
+            len(r.componenets) > 0 for r in rooms if not r.id.startswith("FITxxxx")
+        ), "Rooms should have components"
+
         # Step 2: Load and process YMBD (if available)
         ymbd_coverage = 0
         if ymbd_file:
@@ -518,16 +507,45 @@ class TestIntegration:
             nc12s = parse_ymbd_to_sales_records(nc12s, ymbd_df)
             ymbd_coverage = sum(1 for nc in nc12s if len(nc.sales_history) > 0)
             print(f"   ✓ Updated {ymbd_coverage}/{len(nc12s)} 12NCs with sales data")
+
+            # Validate YMBD data
+            if ymbd_coverage > 0:
+                all_ymbd_records = [sr for nc in nc12s for sr in nc.sales_history]
+                assert all(
+                    isinstance(sr, SalesRecord) for sr in all_ymbd_records
+                ), "All should be SalesRecord objects"
+                assert all(
+                    hasattr(sr, "date") and sr.date for sr in all_ymbd_records
+                ), "All should have dates"
+                assert all(
+                    sr.quantity > 0 for sr in all_ymbd_records
+                ), "All quantities should be positive"
         else:
             print("\n2️⃣  Skipping YMBD (no file provided)")
 
         # Step 3: Load and process FIT/CVI (if available)
-        fit_records = []
+        fit_coverage = 0
         if fit_file:
             print("\n3️⃣  Loading and processing FIT/CVI...")
             fit_df = read_file(fit_file, "fit_cvi", header=0)
-            fit_records = parse_fit_cvi_to_sales_records(rooms, fit_df)
-            print(f"   ✓ Created {len(fit_records)} FIT/CVI sales records")
+            rooms = parse_fit_cvi_to_sales_records(rooms, fit_df)
+            fit_coverage = sum(1 for r in rooms if len(r.sales_history) > 0)
+            all_fit_records = [sr for r in rooms for sr in r.sales_history]
+            print(
+                f"   ✓ Updated {fit_coverage}/{len(rooms)} rooms with {len(all_fit_records)} sales records"
+            )
+
+            # Validate FIT/CVI data
+            if all_fit_records:
+                assert all(
+                    isinstance(sr, SalesRecord) for sr in all_fit_records
+                ), "All should be SalesRecord objects"
+                assert all(
+                    hasattr(sr, "date") and sr.date for sr in all_fit_records
+                ), "All should have dates"
+                assert all(
+                    sr.quantity > 0 for sr in all_fit_records
+                ), "All quantities should be positive"
         else:
             print("\n3️⃣  Skipping FIT/CVI (no file provided)")
 
@@ -535,54 +553,143 @@ class TestIntegration:
         pipeline_time = (end_time - start_time) * 1000
 
         # Calculate totals
-        total_sales_records = sum(len(nc.sales_history) for nc in nc12s) + len(fit_records)
+        total_ymbd_records = sum(len(nc.sales_history) for nc in nc12s)
+        total_fit_records = sum(len(r.sales_history) for r in rooms)
+        total_sales_records = total_ymbd_records + total_fit_records
 
         print(f"\n✅ PIPELINE COMPLETE")
         print(f"  - Total time: {pipeline_time:.2f} ms")
         print(f"  - Rooms: {len(rooms)}")
         print(f"  - 12NCs: {len(nc12s)}")
+        print(f"  - YMBD sales records: {total_ymbd_records:,}")
+        print(f"  - FIT/CVI sales records: {total_fit_records:,}")
         print(f"  - Total sales records: {total_sales_records:,}")
 
-        # Data consistency checks
-        print(f"\n🔍 Data Consistency Checks:")
+        # Final object validation
+        print(f"\n🔍 Final Object Validation:")
 
-        # Check 1: All rooms have valid IDs
-        rooms_valid = all(r.id for r in rooms)
-        print(f"  {'✓' if rooms_valid else '✗'} All rooms have IDs")
-        assert rooms_valid, "All rooms should have IDs"
+        # Room validation
+        invalid_rooms = [r for r in rooms if not r.id or not isinstance(r, Room)]
+        print(
+            f"  {'✓' if not invalid_rooms else '✗'} All rooms valid: {len(rooms) - len(invalid_rooms)}/{len(rooms)}"
+        )
+        assert not invalid_rooms, f"Found {len(invalid_rooms)} invalid rooms"
 
-        # Check 2: All 12NCs have valid IDs
-        nc12s_valid = all(nc.id and len(nc.id) == 12 and nc.id.isdigit() for nc in nc12s)
-        print(f"  {'✓' if nc12s_valid else '✗'} All 12NCs have valid 12-digit IDs")
-        assert nc12s_valid, "All 12NCs should have valid IDs"
+        # 12NC validation
+        invalid_12ncs = [
+            nc for nc in nc12s if not nc.id or len(nc.id) != 12 or not isinstance(nc, TwelveNC)
+        ]
+        print(
+            f"  {'✓' if not invalid_12ncs else '✗'} All 12NCs valid: {len(nc12s) - len(invalid_12ncs)}/{len(nc12s)}"
+        )
+        assert not invalid_12ncs, f"Found {len(invalid_12ncs)} invalid 12NCs"
 
-        # Check 3: All sales records have valid dates
+        # Sales data validation
         if ymbd_coverage > 0:
-            sales_dates_valid = True
-            for nc in nc12s:
-                for record in nc.sales_history:
-                    if not hasattr(record, "date") or record.date is None:
-                        sales_dates_valid = False
-                        break
-                if not sales_dates_valid:
-                    break
-            print(f"  {'✓' if sales_dates_valid else '✗'} All YMBD sales records have valid dates")
-            assert sales_dates_valid, "All sales records should have valid dates"
+            print(
+                f"  ✓ YMBD coverage: {ymbd_coverage}/{len(nc12s)} 12NCs ({ymbd_coverage/len(nc12s)*100:.1f}%)"
+            )
 
-        # Check 4: All sales records have positive quantities
-        if ymbd_coverage > 0:
-            quantities_valid = True
-            for nc in nc12s:
-                for record in nc.sales_history:
-                    if record.quantity <= 0:
-                        quantities_valid = False
-                        break
-                if not quantities_valid:
-                    break
-            print(f"  {'✓' if quantities_valid else '✗'} All sales quantities are positive")
-            assert quantities_valid, "All sales quantities should be positive"
+            # Show uncovered 12NCs
+            uncovered_12ncs = [nc for nc in nc12s if len(nc.sales_history) == 0]
+            if uncovered_12ncs and len(uncovered_12ncs) <= 10:
+                print(f"\n  ⚠️  Uncovered 12NCs ({len(uncovered_12ncs)}):")
+                for nc in uncovered_12ncs[:10]:
+                    print(f"     - {nc.id}: {nc.description[:50]}")
+            elif uncovered_12ncs:
+                print(f"\n  ⚠️  Uncovered 12NCs ({len(uncovered_12ncs)}):")
+                for nc in uncovered_12ncs[:5]:
+                    print(f"     - {nc.id}: {nc.description[:50]}")
+                print(f"     ... and {len(uncovered_12ncs) - 5} more")
 
-        print(f"\n🎉 All consistency checks passed!")
+        if fit_coverage > 0:
+            print(
+                f"  ✓ FIT/CVI coverage: {fit_coverage}/{len(rooms)} rooms ({fit_coverage/len(rooms)*100:.1f}%)"
+            )
+
+            # Show uncovered rooms
+            uncovered_rooms = [r for r in rooms if len(r.sales_history) == 0]
+            if uncovered_rooms and len(uncovered_rooms) <= 10:
+                print(f"\n  ⚠️  Uncovered Rooms ({len(uncovered_rooms)}):")
+                for room in uncovered_rooms[:10]:
+                    print(f"     - {room.id}: {room.description[:50]}")
+            elif uncovered_rooms:
+                print(f"\n  ⚠️  Uncovered Rooms ({len(uncovered_rooms)}):")
+                for room in uncovered_rooms[:5]:
+                    print(f"     - {room.id}: {room.description[:50]}")
+                print(f"     ... and {len(uncovered_rooms) - 5} more")
+
+        print(f"\n💡 Possible Reasons for Missing Coverage:")
+        print(f"   • Different ID formats between files (normalization mismatch)")
+        print(f"   • Obsolete or not-yet-released items in CBOM")
+        print(f"   • Placeholder SKUs in bills of material")
+        print(f"   • Historical items with no recent sales activity")
+
+        # Object lifecycle tracking
+        print(f"\n📊 OBJECT LIFECYCLE TRACKING:")
+        print(f"\n  🔹 Sample 12NC Object Lifecycle:")
+
+        # Find a 12NC with YMBD data
+        sample_12nc = None
+        for nc in nc12s:
+            if len(nc.sales_history) > 0:
+                sample_12nc = nc
+                break
+
+        if sample_12nc:
+            print(f"     ID: {sample_12nc.id}")
+            print(f"     Description: {sample_12nc.description[:60]}...")
+            print(
+                f"     After CBOM: rooms={len(sample_12nc.rooms)}, items={sample_12nc.total_items}"
+            )
+            print(f"     After YMBD: sales_records={len(sample_12nc.sales_history)}")
+            if sample_12nc.sales_history:
+                dates = sorted(set(sr.date for sr in sample_12nc.sales_history))
+                total_qty = sum(sr.quantity for sr in sample_12nc.sales_history)
+                print(f"               date_range=[{dates[0]}, {dates[-1]}], total_qty={total_qty}")
+        else:
+            sample_12nc = nc12s[0] if nc12s else None
+            if sample_12nc:
+                print(f"     ID: {sample_12nc.id}")
+                print(f"     Description: {sample_12nc.description[:60]}...")
+                print(
+                    f"     After CBOM: rooms={len(sample_12nc.rooms)}, items={sample_12nc.total_items}"
+                )
+                print(f"     After YMBD: sales_records=0 (no matching sales data)")
+
+        print(f"\n  🔹 Sample Room Object Lifecycle:")
+
+        # Find a room with FIT/CVI data
+        sample_room = None
+        for room in rooms:
+            if len(room.sales_history) > 0:
+                sample_room = room
+                break
+
+        if sample_room:
+            print(f"     ID: {sample_room.id}")
+            print(f"     Description: {sample_room.description[:60]}...")
+            print(
+                f"     After CBOM: components={len(sample_room.componenets)}, items={sample_room.total_items}"
+            )
+            print(f"     After FIT/CVI: sales_records={len(sample_room.sales_history)}")
+            if sample_room.sales_history:
+                dates = sorted(set(sr.date for sr in sample_room.sales_history))
+                total_qty = sum(sr.quantity for sr in sample_room.sales_history)
+                print(
+                    f"                 date_range=[{dates[0]}, {dates[-1]}], total_qty={total_qty}"
+                )
+        else:
+            sample_room = rooms[0] if rooms else None
+            if sample_room:
+                print(f"     ID: {sample_room.id}")
+                print(f"     Description: {sample_room.description[:60]}...")
+                print(
+                    f"     After CBOM: components={len(sample_room.componenets)}, items={sample_room.total_items}"
+                )
+                print(f"     After FIT/CVI: sales_records=0 (no matching sales data)")
+
+        print(f"\n🎉 All validation checks passed!")
         print("\n" + "=" * 80)
 
 
