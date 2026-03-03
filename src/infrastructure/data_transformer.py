@@ -122,33 +122,18 @@ def transform_cbom_data(
     return rooms, nc12s
 
 
-def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
-    """Parse YMBD DataFrame to SalesRecord objects
+def parse_ymbd_to_sales_records(tnc_list: List[TwelveNC], ymbd_df) -> List[TwelveNC]:
+    """Parse YMBD DataFrame to SalesRecord objects and link to TwelveNC objects
     args:
+        - tnc_list: List of TwelveNC objects
         - ymbd_df: DataFrame with columns 'Component', 'Component Quantity', 'Confirmed Delivery Date'
 
     returns:
-        - List of SalesRecord objects with identifier (12NC), quantity, and date
+        - List of twelve_ncs with sales history populated as list of SalesRecord objects
     """
-
-    sales_records = []
     ymbd_config = load_config()["ymbd"]
-
-    # Debug: Check for the specific 12NC
-    target_12nc = "989606130501"
-    print(f"\n[YMBD DEBUG] Looking for 12NC {target_12nc} in YMBD data...")
-    print(f"[YMBD DEBUG] Total rows in YMBD: {len(ymbd_df)}")
-    print(f"[YMBD DEBUG] Component column dtype: {ymbd_df['Component'].dtype}")
-    print(f"[YMBD DEBUG] First 5 Component values: {ymbd_df['Component'].head().tolist()}")
-
-    # Check if target exists in raw data
-    raw_match = ymbd_df["Component"].astype(str).str.contains(target_12nc, na=False).any()
-    print(f"[YMBD DEBUG] Target {target_12nc} found in raw Component column: {raw_match}")
-
-    # Get date format from config
     date_format = ymbd_config.get("date_format", "MM-DD-YYYY")
 
-    # Convert format string to strptime format
     date_format_map = {
         "MM-DD-YYYY": "%m-%d-%Y",
         "DD-MMM-YYYY": "%d-%b-%Y",
@@ -156,87 +141,79 @@ def parse_ymbd_to_sales_records(ymbd_df) -> List[SalesRecord]:
     }
     strptime_format = date_format_map.get(date_format, "%m-%d-%Y")
 
-    matching_count = 0
+    # Step 1: Build ymbd dictionary {12NC: [(date, qty), ...]} - O(n)
+    ymbd_dict = {}
+    skipped = 0
+
     for _, row in ymbd_df.iterrows():
         try:
-            date_str = str(row[ymbd_config["columns"].get("date", "")]).strip()
+            component_value = row[ymbd_config["columns"].get("12nc", "")]
+            if pd.isna(component_value):
+                skipped += 1
+                continue
 
-            # Try config format first, then fallbacks (prioritize MM-DD-YYYY)
+            twelve_nc = normalize_identifier(component_value)
+
+            # Fixed validation
+            if (not twelve_nc) or (not twelve_nc.isdigit()) or (len(twelve_nc) != 12):
+                skipped += 1
+                continue
+
+            # Parse date
+            date_str = str(row[ymbd_config["columns"].get("date", "")]).strip()
             try:
                 sales_date = datetime.strptime(date_str, strptime_format).date()
             except ValueError:
-                # Fallback formats
+                parsed = False
                 for fmt in ["%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%b-%Y"]:
                     try:
                         sales_date = datetime.strptime(date_str, fmt).date()
+                        parsed = True
                         break
                     except ValueError:
                         continue
-                else:
-                    print(f"Warning: Could not parse date '{date_str}', skipping row")
+                if not parsed:
+                    skipped += 1
                     continue
 
-            # Handle Component value - ensure it's properly formatted as a 12-digit string
-            component_value = row[ymbd_config["columns"].get("12nc", "")]
-            if pd.isna(component_value):
-                print(f"Warning: Empty Component value, skipping row")
-                continue
-
-            # Use normalize_identifier to remove hyphens, decimals, etc.
-            twelve_nc = normalize_identifier(component_value)
-
-            # Validate it's 12 digits after normalization
-            if not twelve_nc or len(twelve_nc) != 12 or not twelve_nc.isdigit():
-                # Pad with zeros if needed
-                twelve_nc = twelve_nc.zfill(12)
-
-            # DEBUG: Show normalization for first row
-            if matching_count == 0:
-                print(
-                    f"[YMBD DEBUG] First 12NC normalization: '{component_value}' -> '{twelve_nc}'"
-                )
-                matching_count = -1  # Mark that we printed first one
-
-            # Debug: Check if this is our target 12NC
-            if twelve_nc == target_12nc:
-                if matching_count == -1:
-                    matching_count = 1
-                else:
-                    matching_count += 1
-                if matching_count <= 3:  # Only print first few matches
-                    print(
-                        f"[YMBD DEBUG] ✓✓✓ Found {target_12nc}: date={sales_date}, qty={row[ymbd_config['columns'].get('sales', '')]}, raw='{component_value}'"
-                    )
-
             quantity = int(row[ymbd_config["columns"].get("sales", "")])
-            sales_record = SalesRecord(identifier=twelve_nc, quantity=quantity, date=sales_date)
-            # We'll need room mapping from CBOM
-            sales_records.append(sales_record)
+
+            if twelve_nc not in ymbd_dict:
+                ymbd_dict[twelve_nc] = []
+            ymbd_dict[twelve_nc].append((sales_date, quantity))
+
         except Exception as e:
-            print(f"Warning: Skipping row due to error: {e}")
+            skipped += 1
             continue
+    matched_12ncs = 0
+    matched_records = 0
+    for tnc in tnc_list:
+        if tnc.id in ymbd_dict.keys():
+            matched_12ncs += 1
+            for date, qty in ymbd_dict[tnc.id]:
+                sales_record = SalesRecord(identifier=tnc.id, quantity=qty, date=date)
+                tnc.sales_history.append(sales_record)
+                matched_records += 1
+    print(
+        f"YMBD: Updated {matched_12ncs}/{len(tnc_list)} TwelveNCs with {matched_records} sales records, skipped {skipped} rows"
+    )
+    return tnc_list
 
-    print(f"[DEBUG] Total records found for {target_12nc}: {matching_count}")
 
-    # Additional debug: Show summary of quantities found
-    if matching_count > 0:
-        target_quantities = [r.quantity for r in sales_records if r.identifier == target_12nc]
-        print(f"[YMBD DEBUG] Total quantity sum for {target_12nc}: {sum(target_quantities)}")
-        print(f"[YMBD DEBUG] Number of records: {len(target_quantities)}")
-        print(
-            f"[YMBD DEBUG] Min qty: {min(target_quantities)}, Max qty: {max(target_quantities)}, Avg: {sum(target_quantities)/len(target_quantities):.1f}"
-        )
+def parse_fit_cvi_to_sales_records(room_list: List[Room], fit_cvi_df) -> List[Room]:
+    """Parse FIT/CVI DataFrame and populate Room objects with sales history.
 
-    return sales_records
+    Note: Mutates room_list by appending to sales_history of each room's components.
 
+    args:
+        - room_list: List of Room objects (will be modified in-place)
+        - fit_cvi_df: DataFrame with FIT/CVI sales data (room-level)
 
-def parse_fit_cvi_to_sales_records(fit_cvi_df) -> List[SalesRecord]:
-    """Parse FIT_CVI DataFrame to SalesRecord objects using config date format"""
-    sales_records = []
-
-    # Get date format from config
+    returns:
+        - The same room_list with populated sales_history
+    """
     fit_config = load_config()["fit_cvi"]
-    date_format = fit_config.get("date_format", "DD-MMM-YYYY")  # "DD-MMM-YYYY"
+    date_format = fit_config.get("date_format", "DD-MMM-YYYY")
 
     date_format_map = {
         "MM-DD-YYYY": "%m-%d-%Y",
@@ -245,31 +222,69 @@ def parse_fit_cvi_to_sales_records(fit_cvi_df) -> List[SalesRecord]:
     }
     strptime_format = date_format_map.get(date_format, "%d-%b-%Y")
 
+    # Step 1: Build fit dictionary {room_id: [(date, qty), ...]} - O(n)
+    fit_dict = {}
+    skipped = 0
+
     for _, row in fit_cvi_df.iterrows():
         try:
-            date_str = str(row["SD Item\nFSD"]).strip()
+            room_value = row[fit_config["columns"].get("room", "")]
+            if pd.isna(room_value):
+                skipped += 1
+                continue
 
+            room_id = normalize_identifier(room_value)
+
+            if not room_id:
+                skipped += 1
+                continue
+
+            # Parse date
+            date_str = str(row[fit_config["columns"].get("date", "")]).strip()
             try:
                 sales_date = datetime.strptime(date_str, strptime_format).date()
             except ValueError:
-                # Fallback formats
-                for fmt in ["%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%b-%Y"]:
+                parsed = False
+                for fmt in ["%d-%b-%Y", "%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
                     try:
                         sales_date = datetime.strptime(date_str, fmt).date()
+                        parsed = True
                         break
                     except ValueError:
                         continue
-                else:
-                    print(f"Warning: Could not parse date '{date_str}', skipping row")
+                if not parsed:
+                    skipped += 1
                     continue
 
-            room = str(row[fit_config["columns"].get("room", "")]).strip()
             quantity = int(row[fit_config["columns"].get("sales", "")])
 
-            sales_record = SalesRecord(identifier=room, quantity=quantity, date=sales_date)
-            sales_records.append(sales_record)
+            if room_id not in fit_dict:
+                fit_dict[room_id] = []
+            fit_dict[room_id].append((sales_date, quantity))
+
         except Exception as e:
-            print(f"Warning: Skipping row due to error: {e}")
+            skipped += 1
             continue
 
-    return sales_records
+    # Step 2: Update Room objects and their components - O(m)
+    matched_rooms = 0
+    total_records = 0
+
+    for room in room_list:
+        if room.id in fit_dict.keys():
+            matched_rooms += 1
+            # Add sales records to each component in the room
+            for sales_date, quantity in fit_dict[room.id]:
+                sales_record = SalesRecord(
+                    identifier=room.id,
+                    quantity=quantity,  # Room-level quantity applies to all components
+                    date=sales_date,
+                )
+                room.sales_history.append(sales_record)
+                total_records += 1
+
+    print(
+        f"FIT/CVI: Updated {matched_rooms}/{len(room_list)} rooms with {total_records} sales records, skipped {skipped} rows"
+    )
+
+    return room_list

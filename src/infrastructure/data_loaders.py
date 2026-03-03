@@ -38,14 +38,15 @@ def load_cbom(cbom_path, config) -> tuple[dict, dict]:
     room_data = {}
     data_12nc = {}
 
+    cbom_config = config["cbom"]
     # Get configuration values
-    room_col_start = config["cbom"]["columns"].get("room_start", "G")
-    room_num_row = config["cbom"]["rows"].get("room_numbers", 5)
-    room_desc_row = config["cbom"]["rows"].get("room_descriptions", 4)
-    nc12_col = config["cbom"]["columns"].get("12nc", "C")
-    nc12_desc_col = config["cbom"]["columns"].get("12nc_description", "D")
-    nc12_igt_col = config["cbom"]["columns"].get("12nc_igt", "A")
-    nc12_row_start = config["cbom"]["rows"].get("12nc_start", 9)
+    room_col_start = cbom_config["columns"].get("room_start", "G")
+    room_num_row = cbom_config["rows"].get("room_numbers", 5)
+    room_desc_row = cbom_config["rows"].get("room_descriptions", 4)
+    nc12_col = cbom_config["columns"].get("12nc", "C")
+    nc12_desc_col = cbom_config["columns"].get("12nc_description", "D")
+    nc12_igt_col = cbom_config["columns"].get("IGT_12nc", "A")
+    nc12_row_start = cbom_config["rows"].get("12nc_start", 9)
 
     df = read_file(cbom_path, "cbom", header=None)
     if df is None:
