@@ -118,14 +118,15 @@ def parse_ymbd_to_sales_records(tnc_list: List[TwelveNC], ymbd_df) -> List[Twelv
         - List of twelve_ncs with sales history populated as list of SalesRecord objects
     """
     ymbd_config = load_config()["ymbd"]
-    date_format = ymbd_config.get("date_format", "MM-DD-YYYY")
+    date_format = ymbd_config.get("date_format", "YYYY-MM-DD HH:MM:SS")
 
     date_format_map = {
         "MM-DD-YYYY": "%m-%d-%Y",
         "DD-MMM-YYYY": "%d-%b-%Y",
         "YYYY-MM-DD": "%Y-%m-%d",
+        "YYYY-MM-DD HH:MM:SS": "%Y-%m-%d %H:%M:%S",
     }
-    strptime_format = date_format_map.get(date_format, "%m-%d-%Y")
+    strptime_format = date_format_map.get(date_format, "%Y-%m-%d %H:%M:%S")
     # Step 1: Build ymbd dictionary {12NC: [(date, qty), ...]} - O(n)
     ymbd_dict = {}
     skipped = 0
@@ -150,7 +151,8 @@ def parse_ymbd_to_sales_records(tnc_list: List[TwelveNC], ymbd_df) -> List[Twelv
                 sales_date = datetime.strptime(date_str, strptime_format).date()
             except ValueError:
                 parsed = False
-                for fmt in ["%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%b-%Y"]:
+                # Try fallback formats: YYYY-MM-DD HH:MM:SS first (actual format), then others
+                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m-%d-%Y", "%d-%b-%Y"]:
                     try:
                         sales_date = datetime.strptime(date_str, fmt).date()
                         parsed = True
@@ -195,14 +197,15 @@ def parse_fit_cvi_to_sales_records(room_list: List[Room], fit_cvi_df) -> List[Ro
         - The same room_list with populated sales_history
     """
     fit_config = load_config()["fit_cvi"]
-    date_format = fit_config.get("date_format", "DD-MMM-YYYY")
+    date_format = fit_config.get("date_format", "YYYY-MM-DD HH:MM:SS")
 
     date_format_map = {
         "MM-DD-YYYY": "%m-%d-%Y",
         "DD-MMM-YYYY": "%d-%b-%Y",
         "YYYY-MM-DD": "%Y-%m-%d",
+        "YYYY-MM-DD HH:MM:SS": "%Y-%m-%d %H:%M:%S",
     }
-    strptime_format = date_format_map.get(date_format, "%d-%b-%Y")
+    strptime_format = date_format_map.get(date_format, "%Y-%m-%d %H:%M:%S")
 
     # Step 1: Build fit dictionary {room_id: [(date, qty), ...]} - O(n)
     fit_dict = {}
@@ -223,20 +226,13 @@ def parse_fit_cvi_to_sales_records(room_list: List[Room], fit_cvi_df) -> List[Ro
 
             # Parse date
             date_str = str(row[fit_config["columns"].get("date", "")]).strip()
-            print("############################################################")
-            print(f"[FIT DEBUG] Parsing date: '{date_str}' for room: '{room_id}'")
-            print("############################################################")
             try:
                 sales_date = datetime.strptime(date_str, strptime_format).date()
-                print(
-                    f"[FIT DEBUG] Primary format success: '{date_str}' parsed with format '{strptime_format}'"
-                )
             except ValueError:
                 parsed = False
-                print(
-                    f"[FIT DEBUG] Primary format failed: '{date_str}' with format '{strptime_format}'"
-                )
-                for fmt in ["%d-%b-%Y", "%m-%d-%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
+
+                # Try fallback formats: YYYY-MM-DD HH:MM:SS first (actual format), then others
+                for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m-%d-%Y", "%d-%b-%Y"]:
                     try:
                         sales_date = datetime.strptime(date_str, fmt).date()
                         parsed = True

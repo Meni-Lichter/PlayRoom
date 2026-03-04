@@ -258,7 +258,7 @@ class TestAnalysis:
 
         print(f"\n12NC Single Item Analysis:")
         print(f"  12NC ID: {target_nc.id}")
-        print(f"  Sales records: {len(target_nc.sales_history)}")
+        print(f"  Overall Sales records: {len(target_nc.sales_history)}")
         print(f"  Analysis time: {analysis_time:.2f} ms")
         print(f"  Periods analyzed: {result.period_count}")
         print(f"  Total quantity: {result.total:,}")
@@ -417,8 +417,30 @@ class TestAnalysis:
                     f"       Periods: {result.period_count}, Avg per period: {result.average:.2f}"
                 )
                 if len(result.periods) > 0:
-                    min_period = result.periods[0].label
-                    max_period = result.periods[-1].label
+                    # Sort periods chronologically by parsing MM-YYYY format
+                    def parse_period_key(label):
+                        try:
+                            if "-Q" in label:  # Quarterly: YYYY-Qn
+                                parts = label.split("-Q")
+                                year = int(parts[0])
+                                quarter = int(parts[1])
+                                return (year, quarter * 3)
+                            elif len(label) == 7 and label[2] == "-":  # Monthly: MM-YYYY
+                                month, year = label.split("-")
+                                return (int(year), int(month))
+                            elif len(label) == 4 and label.isdigit():  # Yearly: YYYY
+                                return (int(label), 0)
+                            elif len(label) == 10 and label.count("-") == 2:  # Daily: MM-DD-YYYY
+                                parts = label.split("-")
+                                return (int(parts[2]), int(parts[0]), int(parts[1]))
+                            else:
+                                return (0, 0)
+                        except:
+                            return (0, 0)
+
+                    sorted_periods = sorted(result.periods, key=lambda p: parse_period_key(p.label))
+                    min_period = sorted_periods[0].label
+                    max_period = sorted_periods[-1].label
                     print(f"       Time range: {min_period} to {max_period}")
             except (AttributeError, IndexError) as e:
                 print(f"    {idx+1}. Error displaying details: {e}")
@@ -690,7 +712,7 @@ class TestAnalysisIntegration:
 class TestPrediction:
     """Test the prediction functionality"""
 
-    def test_single_prediction_avg_method(self, prepared_data):
+    def test_prediction_last_n_periods_method(self, prepared_data):
         """Test single period prediction using average method"""
         rooms, nc12s = prepared_data
 
@@ -721,7 +743,7 @@ class TestPrediction:
 
         start_time = time.perf_counter()
         prediction = predictor.predict(
-            target_time=next_period, method="average", buffer_percentage=10.0
+            target_time=next_period, method="avg_last_n_periods", buffer_percentage=10.0
         )
         pred_time = (time.perf_counter() - start_time) * 1000
 
@@ -732,11 +754,11 @@ class TestPrediction:
 
         print(f"\n12NC Single Prediction (Average Method):")
         print(f"  12NC ID: {target_nc.id}")
-        print(f"  Prediction time: {pred_time:.2f} ms")
+        print(f"  Period: {prediction.period_label}")
         print(f"  Baseline: {prediction.baseline:.2f}")
         print(f"  Buffer: {prediction.buffer_percentage}%")
         print(f"  Predicted: {prediction.predicted_quantity:.2f}")
-        print(f"  Period: {prediction.period_label}")
+        print(f"  Prediction time: {pred_time:.2f} ms")
 
     def test_prediction_same_period_method(self, prepared_data):
         """Test prediction using same-period-previous-years method"""
@@ -776,59 +798,11 @@ class TestPrediction:
 
         print(f"\n12NC Prediction (Same-Period Method):")
         print(f"  12NC ID: {target_nc.id}")
-        print(f"  Prediction time: {pred_time:.2f} ms")
+        print(f"  Period: {prediction.period_label}")
         print(f"  Baseline: {prediction.baseline:.2f}")
         print(f"  Method: {prediction.method}")
         print(f"  Predicted: {prediction.predicted_quantity:.2f}")
-        print(f"  Period: {prediction.period_label}")
-
-    def test_prediction_last_n_periods_method(self, prepared_data):
-        """Test prediction using last-n-periods average method"""
-        rooms, nc12s = prepared_data
-
-        target_nc = None
-        for nc in nc12s:
-            if len(nc.sales_history) > 0:
-                target_nc = nc
-                break
-
-        if not target_nc:
-            pytest.skip("No 12NC with sales data found")
-
-        analyzer = PerformanceAnalyzer()
-        performance_data = analyzer.analyze(
-            wrap_entity(target_nc), lookback_years=3, granularity="monthly"
-        )
-
-        if len(performance_data.periods) < 5:
-            pytest.skip("Insufficient periods for n-period average")
-
-        predictor = Predictor(performance_data)
-        from src.utils import get_next_period_label
-
-        next_period = get_next_period_label("monthly")
-
-        start_time = time.perf_counter()
-        prediction = predictor.predict(
-            target_time=next_period,
-            method="avg_last_n_periods",
-            buffer_percentage=10.0,
-            n_periods=6,
-        )
-        pred_time = (time.perf_counter() - start_time) * 1000
-
-        assert isinstance(prediction, Prediction)
-        assert prediction.predicted_quantity > 0
-        assert prediction.method == "avg_last_n_periods"
-
-        print(f"\n12NC Prediction (Last-N-Periods Method):")
-        print(f"  12NC ID: {target_nc.id}")
         print(f"  Prediction time: {pred_time:.2f} ms")
-        print(f"  N Periods: 6")
-        print(f"  Baseline: {prediction.baseline:.2f}")
-        print(f"  Method: {prediction.method}")
-        print(f"  Predicted: {prediction.predicted_quantity:.2f}")
-        print(f"  Period: {prediction.period_label}")
 
     def test_prediction_buffer_impact(self, prepared_data):
         """Test impact of different buffer percentages"""
@@ -862,7 +836,7 @@ class TestPrediction:
         print(f"\nBuffer Impact Test (12NC: {target_nc.id}):")
         for buffer in buffers:
             prediction = predictor.predict(
-                target_time=next_period, method="average", buffer_percentage=buffer
+                target_time=next_period, method="avg_last_n_periods", buffer_percentage=buffer
             )
             results[buffer] = prediction.predicted_quantity
             print(f"  Buffer {buffer}%: {prediction.predicted_quantity:.2f}")
@@ -886,7 +860,7 @@ class TestPrediction:
             pytest.skip("No 12NC with sales data found")
 
         analyzer = PerformanceAnalyzer()
-        granularities = ["monthly", "quarterly", "yearly"]
+        granularities = ["monthly", "quarterly", "yearly", "daily"]
         results = {}
 
         print(f"\nGranularity Prediction Test (12NC: {target_nc.id}):")
@@ -904,9 +878,10 @@ class TestPrediction:
             next_period = get_next_period_label(granularity)
 
             prediction = predictor.predict(
-                target_time=next_period, method="average", buffer_percentage=10.0
+                target_time=next_period, method="avg_last_n_periods", buffer_percentage=10.0
             )
             results[granularity] = {
+                "prediction_time": prediction.period_label,
                 "predicted": prediction.predicted_quantity,
                 "periods": len(performance_data.periods),
                 "average": performance_data.average,
@@ -915,7 +890,7 @@ class TestPrediction:
                 f"  {granularity}: {prediction.predicted_quantity:.2f} (avg: {performance_data.average:.2f}, periods: {len(performance_data.periods)})"
             )
 
-    def test_room_prediction(self, prepared_data):
+    def test_room_prediction_same_period_previous_years(self, prepared_data):
         """Test prediction for Room objects"""
         rooms, nc12s = prepared_data
 
@@ -943,7 +918,7 @@ class TestPrediction:
 
         start_time = time.perf_counter()
         prediction = predictor.predict(
-            target_time=next_period, method="average", buffer_percentage=10.0
+            target_time=next_period, method="avg_same_period_previous_years", buffer_percentage=10.0
         )
         pred_time = (time.perf_counter() - start_time) * 1000
 
@@ -952,11 +927,54 @@ class TestPrediction:
 
         print(f"\nRoom Prediction:")
         print(f"  Room ID: {target_room.id}")
-        print(f"  Prediction time: {pred_time:.2f} ms")
+        print(f"  Period: {prediction.period_label}")
         print(f"  Baseline: {prediction.baseline:.2f}")
         print(f"  Buffer: {prediction.buffer_percentage}%")
         print(f"  Predicted: {prediction.predicted_quantity:.2f}")
+        print(f"  Prediction time: {pred_time:.2f} ms")
+
+    def test_room_prediction_last_n_periods(self, prepared_data):
+        """Test prediction for Room objects"""
+        rooms, nc12s = prepared_data
+
+        target_room = None
+        for room in rooms:
+            if len(room.sales_history) > 0:
+                target_room = room
+                break
+
+        if not target_room:
+            pytest.skip("No Room with sales data found")
+
+        analyzer = PerformanceAnalyzer()
+        performance_data = analyzer.analyze(
+            wrap_entity(target_room), lookback_years=3, granularity="monthly"
+        )
+
+        if len(performance_data.periods) == 0:
+            pytest.skip("No periods in performance data")
+
+        predictor = Predictor(performance_data)
+        from src.utils import get_next_period_label
+
+        next_period = get_next_period_label("monthly")
+
+        start_time = time.perf_counter()
+        prediction = predictor.predict(
+            target_time=next_period, method="avg_last_n_periods", buffer_percentage=10.0
+        )
+        pred_time = (time.perf_counter() - start_time) * 1000
+
+        assert isinstance(prediction, Prediction)
+        assert prediction.predicted_quantity > 0
+
+        print(f"\nRoom Prediction:")
+        print(f"  Room ID: {target_room.id}")
         print(f"  Period: {prediction.period_label}")
+        print(f"  Baseline: {prediction.baseline:.2f}")
+        print(f"  Buffer: {prediction.buffer_percentage}%")
+        print(f"  Predicted: {prediction.predicted_quantity:.2f}")
+        print(f"  Prediction time: {pred_time:.2f} ms")
 
     def test_batch_predictions(self, prepared_data):
         """Test predicting for multiple items"""
@@ -984,7 +1002,9 @@ class TestPrediction:
             predictor = Predictor(performance_data)
             next_period = get_next_period_label("monthly")
             prediction = predictor.predict(
-                target_time=next_period, method="average", buffer_percentage=10.0
+                target_time=next_period,
+                method="avg_same_period_previous_years",
+                buffer_percentage=10.0,
             )
             predictions.append(prediction)
 
@@ -1035,7 +1055,7 @@ class TestPrediction:
         # Test invalid buffer percentage
         try:
             prediction = predictor.predict(
-                target_time=next_period, method="average", buffer_percentage=-10.0
+                target_time=next_period, method="avg_last_n_periods", buffer_percentage=-10.0
             )
             # If no error, that's fine - implementation may not validate
             print(f"\nPrediction Validation:")
@@ -1046,7 +1066,7 @@ class TestPrediction:
 
         # Test valid prediction
         prediction = predictor.predict(
-            target_time=next_period, method="average", buffer_percentage=10.0
+            target_time=next_period, method="avg_last_n_periods", buffer_percentage=10.0
         )
         assert prediction.predicted_quantity > 0
         print(f"  Valid prediction: {prediction.predicted_quantity:.2f}")

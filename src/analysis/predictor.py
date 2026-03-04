@@ -20,7 +20,7 @@ class Predictor:
     def predict(
         self,
         target_time: str,
-        method: str = "average",
+        method: str = "avg_last_n_periods",
         buffer_percentage: float = 10.0,
         n_periods: int = 11,
     ) -> Prediction:
@@ -55,12 +55,9 @@ class Predictor:
         # Apply buffer
         predicted_quantity = baseline * (1 + buffer_percentage / 100)
 
-        # Determine next period label based on current granularity
-        next_period = get_next_period_label(granularity)
-
         return Prediction(
             g_entity=self.performance_data.g_entity,
-            period_label=next_period,
+            period_label=target_time,
             predicted_quantity=predicted_quantity,
             baseline=baseline,
             buffer_percentage=buffer_percentage,
