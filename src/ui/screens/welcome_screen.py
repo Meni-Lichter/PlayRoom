@@ -10,7 +10,7 @@ class WelcomeScreen(ctk.CTkFrame):
     """Welcome/home screen with file loading and system information"""
     
     def __init__(self, parent, app_controller):
-        super().__init__(parent, fg_color="#F7F9FB")
+        super().__init__(parent, fg_color="#EEF2F6")
         
         self.app_controller = app_controller
         self.loaded_files = {
@@ -42,23 +42,31 @@ class WelcomeScreen(ctk.CTkFrame):
         
         title = ctk.CTkLabel(
             title_frame,
-            text="Welcome to Performance Center",
+            text="Welcome to Play Room",
             font=ctk.CTkFont(family="Segoe UI", size=42, weight="bold"),
-            text_color="#1E293B"
+            text_color="#1E2A33"
         )
         title.pack()
+        
+        description = ctk.CTkLabel(
+            title_frame,
+            text="Performance analysis and demand prediction for 12NC components and Rooms",
+            font=ctk.CTkFont(family="Segoe UI", size=16),
+            text_color="#5F6E7C"
+        )
+        description.pack(pady=(8, 0))
         
         date_label = ctk.CTkLabel(
             title_frame,
             text=f"Today: {datetime.now().strftime('%B %d, %Y')}",
             font=ctk.CTkFont(family="Segoe UI", size=18),
-            text_color="#64748B"
+            text_color="#5F6E7C"
         )
         date_label.pack(pady=8)
     
     def _create_file_loading_section(self, parent):
         """Create file loading section"""
-        file_frame = ctk.CTkFrame(parent, fg_color="#FFFFFF", corner_radius=15)
+        file_frame = ctk.CTkFrame(parent, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#D8E0E8")
         file_frame.pack(fill="x", pady=15)
         
         # Section title
@@ -66,7 +74,7 @@ class WelcomeScreen(ctk.CTkFrame):
             file_frame,
             text="📁 Load Data Files",
             font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"),
-            text_color="#1E293B"
+            text_color="#1E2A33"
         )
         section_title.pack(pady=25, padx=25, anchor="w")
         
@@ -88,8 +96,9 @@ class WelcomeScreen(ctk.CTkFrame):
             width=220,
             height=50,
             corner_radius=8,
-            fg_color="#1F5A73",
-            hover_color="#2EC4B6",
+            fg_color="#35586E",
+            hover_color="#2F4F63",
+            text_color="#FFFFFF",
             font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
         )
         load_btn.pack(pady=25)
@@ -102,9 +111,6 @@ class WelcomeScreen(ctk.CTkFrame):
             text_color="#10b981"
         )
         self.status_label.pack(pady=(0, 25))
-            font=ctk.CTkFont(size=12),
-            text_color="#10b981"
-        )
         self.status_label.pack(pady=(0, 20))
     
     def _create_file_row(self, parent, label, key, description):
@@ -117,7 +123,7 @@ class WelcomeScreen(ctk.CTkFrame):
             row_frame,
             text=label,
             font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
-            text_color="#1E293B",
+            text_color="#1E2A33",
             width=140,
             anchor="w"
         )
@@ -132,8 +138,9 @@ class WelcomeScreen(ctk.CTkFrame):
             width=450,
             height=40,
             corner_radius=8,
-            fg_color="#F7F9FB",
-            border_color="#E2E8F0",
+            fg_color="#FFFFFF",
+            border_color="#D8E0E8",
+            text_color="#5F6E7C",
             font=ctk.CTkFont(family="Segoe UI", size=13)
         )
         path_entry.pack(side="left", padx=8)
@@ -146,8 +153,11 @@ class WelcomeScreen(ctk.CTkFrame):
             width=110,
             height=40,
             corner_radius=8,
-            fg_color="#1F5A73",
-            hover_color="#2EC4B6",
+            fg_color="#E7EDF3",
+            hover_color="#DCE4EC",
+            text_color="#2B3A44",
+            border_width=1,
+            border_color="#D8E0E8",
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
         )
         browse_btn.pack(side="left", padx=8)
@@ -157,7 +167,7 @@ class WelcomeScreen(ctk.CTkFrame):
             row_frame,
             text=description,
             font=ctk.CTkFont(family="Segoe UI", size=13),
-            text_color="#64748B"
+            text_color="#8A98A6"
         )
         desc_label.pack(side="left", padx=12)
         
@@ -166,14 +176,14 @@ class WelcomeScreen(ctk.CTkFrame):
     
     def _create_system_info_section(self, parent):
         """Create system capabilities overview"""
-        info_frame = ctk.CTkFrame(parent, fg_color="#FFFFFF", corner_radius=15)
+        info_frame = ctk.CTkFrame(parent, fg_color="#F8FAFC", corner_radius=15, border_width=1, border_color="#D8E0E8")
         info_frame.pack(fill="x", pady=15)
         
         section_title = ctk.CTkLabel(
             info_frame,
             text="📊 System Capabilities",
             font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"),
-            text_color="#1E293B"
+            text_color="#1E2A33"
         )
         section_title.pack(pady=25, padx=25, anchor="w")
         
@@ -192,7 +202,7 @@ class WelcomeScreen(ctk.CTkFrame):
                 info_frame,
                 text=capability,
                 font=ctk.CTkFont(family="Segoe UI", size=15),
-                text_color="#64748B",
+                text_color="#5F6E7C",
                 anchor="w"
             )
             cap_label.pack(padx=45, pady=6, anchor="w")
@@ -209,13 +219,23 @@ class WelcomeScreen(ctk.CTkFrame):
         btn_frame.pack()
         
         actions = [
-            ("View 12NC", "12nc_mode", "#1F5A73"),
-            ("View Room", "room_mode", "#2EC4B6"),
-            ("Bulk Analysis", "bulk_view", "#f59e0b"),
-            ("Settings", "config", "#64748B")
+            ("View 12NC", "12nc_mode", "#35586E", "#2F4F63"),
+            ("View Room", "room_mode", "#35586E", "#2F4F63"),
+            ("Bulk Analysis", "bulk_view", "#4A8F93", "#3F7F83"),
+            ("Settings", "config", "#E7EDF3", "#DCE4EC")
         ]
         
-        for text, screen, color in actions:
+        for text, screen, color, hover_color in actions:
+            # Determine text color based on button color
+            if color == "#E7EDF3":
+                text_color = "#2B3A44"
+                border_width = 1
+                border_color = "#D8E0E8"
+            else:
+                text_color = "#FFFFFF"
+                border_width = 0
+                border_color = None
+                
             btn = ctk.CTkButton(
                 btn_frame,
                 text=text,
@@ -224,7 +244,10 @@ class WelcomeScreen(ctk.CTkFrame):
                 height=50,
                 corner_radius=10,
                 fg_color=color,
-                hover_color=color,
+                hover_color=hover_color,
+                text_color=text_color,
+                border_width=border_width,
+                border_color=border_color,
                 font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
             )
             btn.pack(side="left", padx=12)

@@ -10,44 +10,42 @@ sys.path.insert(0, str(project_root))
 
 from src.ui.components.side_menu import SideMenu
 from src.ui.screens.welcome_screen import WelcomeScreen
+from src.ui.screens.entity_mode_screen import EntityModeScreen
 
 
 class PerformanceCenterApp(ctk.CTk):
     """Main application window with navigation"""
     
     def __init__(self):
-        super().__init__()
-        
-        # Window configuration
-        self.title("Performance Center - Room & 12NC Analysis")
-        
-        # Set fullscreen
-        self.state('zoomed')  # Windows fullscreen
-        self.attributes('-fullscreen', False)  # Can use True for true fullscreen
-        
-        # Set theme
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
-        
-        # Configure window background
-        self.configure(fg_color="#F7F9FB")
-        
-        # Configure grid to fill screen
+
+        super().__init__()
+
+        # Window configuration
+        self.title("Play Room - Room & 12NC Analysis")
+        self.configure(fg_color="#EEF2F6")
+
+        # Open maximized on Windows
+        self.state("zoomed")
+       
+
+        # Grid layout
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, minsize=250)  # Sidebar fixed width
-        self.grid_columnconfigure(1, weight=1)  # Content area expands
-        
+        self.grid_columnconfigure(0, minsize=250)
+        self.grid_columnconfigure(1, weight=1)
+
         # Data storage
         self.loaded_files = {}
         self.current_data = {}
-        
-        # Create UI components
+
+        # Create UI
         self._create_side_menu()
         self._create_content_area()
-        
-        # Show welcome screen by default
+
+        # Default screen
         self.show_screen("welcome")
-    
+        
     def _create_side_menu(self):
         """Create side navigation menu"""
         # Look for logo in project root
@@ -60,7 +58,7 @@ class PerformanceCenterApp(ctk.CTk):
     
     def _create_content_area(self):
         """Create main content area"""
-        self.content_frame = ctk.CTkFrame(self, fg_color="#F7F9FB", corner_radius=0)
+        self.content_frame = ctk.CTkFrame(self, fg_color="#EEF2F6", corner_radius=0)
         self.content_frame.grid(row=0, column=1, sticky="nsew")
         
         # Dictionary to hold screen instances
@@ -73,14 +71,35 @@ class PerformanceCenterApp(ctk.CTk):
         if self.current_screen:
             self.current_screen.pack_forget()
         
-        # Create screen if it doesn't exist
-        if screen_name not in self.screens:
-            self.screens[screen_name] = self._create_screen(screen_name)
-        
-        # Show requested screen
-        self.current_screen = self.screens[screen_name]
-        if self.current_screen:
+        # For entity mode screens (12nc/room), check if we need to switch mode
+        if screen_name in ["12nc_mode", "room_mode"]:
+            # If entity screen doesn't exist, create it
+            if "entity_mode" not in self.screens:
+                self.screens["entity_mode"] = EntityModeScreen(self.content_frame, self, mode="12nc")
+            
+            # Get the screen instance
+            entity_screen = self.screens["entity_mode"]
+            
+            # Update the mode on the existing screen
+            new_mode = "12nc" if screen_name == "12nc_mode" else "room"
+            if entity_screen.current_mode != new_mode:
+                # Update mode directly
+                entity_screen.current_mode = new_mode
+                # Trigger the mode change handler to update all related UI
+                entity_screen._on_mode_change(None)
+            
+            # Show the entity screen
+            self.current_screen = entity_screen
             self.current_screen.pack(fill="both", expand=True)
+        else:
+            # For other screens, use normal screen creation
+            if screen_name not in self.screens:
+                self.screens[screen_name] = self._create_screen(screen_name)
+            
+            # Show requested screen
+            self.current_screen = self.screens[screen_name]
+            if self.current_screen:
+                self.current_screen.pack(fill="both", expand=True)
         
         # Update side menu highlight
         if hasattr(self, 'side_menu'):
@@ -91,35 +110,60 @@ class PerformanceCenterApp(ctk.CTk):
         if screen_name == "welcome":
             return WelcomeScreen(self.content_frame, self)
         elif screen_name == "12nc_mode":
-            return self._create_placeholder_screen("12NC Mode", "Coming in Stage 3")
+            return EntityModeScreen(self.content_frame, self, mode="12nc")
         elif screen_name == "room_mode":
-            return self._create_placeholder_screen("Room Mode", "Coming in Stage 3")
+            return EntityModeScreen(self.content_frame, self, mode="room")
         elif screen_name == "bulk_view":
-            return self._create_placeholder_screen("Bulk View", "Coming in Stage 9")
+            return self._create_placeholder_screen(
+                "Bulk Analysis View", 
+                "Analyze multiple 12NCs or Rooms simultaneously for comparative insights",
+                "Coming in Stage 9"
+            )
         elif screen_name == "config":
-            return self._create_placeholder_screen("Configuration", "Coming in Stage 8")
+            return self._create_placeholder_screen(
+                "Configuration", 
+                "Manage data sources, prediction settings, and system preferences",
+                "Coming in Stage 8"
+            )
         else:
             return None
     
-    def _create_placeholder_screen(self, title, subtitle):
+    def _create_placeholder_screen(self, title, description, status):
         """Create a placeholder screen for future implementation"""
-        frame = ctk.CTkFrame(self.content_frame, fg_color="#F7F9FB")
+        frame = ctk.CTkFrame(self.content_frame, fg_color="#EEF2F6")
         
-        label = ctk.CTkLabel(
-            frame,
+        # Title section at the top
+        title_container = ctk.CTkFrame(frame, fg_color="transparent")
+        title_container.pack(fill="x", padx=50, pady=(30, 20))
+        
+        title_label = ctk.CTkLabel(
+            title_container,
             text=title,
-            font=ctk.CTkFont(family="Segoe UI", size=42, weight="bold"),
-            text_color="#1E293B"
+            font=ctk.CTkFont(family="Segoe UI", size=32, weight="bold"),
+            text_color="#1E2A33"
         )
-        label.pack(pady=(200, 20))
+        title_label.pack()
         
-        subtitle_label = ctk.CTkLabel(
-            frame,
-            text=subtitle,
-            font=ctk.CTkFont(family="Segoe UI", size=20),
-            text_color="#64748B"
+        desc_label = ctk.CTkLabel(
+            title_container,
+            text=description,
+            font=ctk.CTkFont(family="Segoe UI", size=15),
+            text_color="#5F6E7C"
         )
-        subtitle_label.pack()
+        desc_label.pack(pady=(5, 0))
+        
+        # Coming soon message in center
+        center_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        center_frame.pack(expand=True)
+        
+        status_label = ctk.CTkLabel(
+            center_frame,
+            text=status,
+            font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"),
+            text_color="#8A98A6"
+        )
+        status_label.pack()
+        
         
         return frame
     
