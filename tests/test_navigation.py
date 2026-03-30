@@ -37,7 +37,7 @@ def app_with_data():
         Room(
             id=f"ROOM_{i:03d}", 
             description=f"Room {i}",
-            componenets={},
+            components={},
             sales_history=[]
         )
         for i in range(1, 6)
@@ -47,7 +47,7 @@ def app_with_data():
             id=f"12NC_{i:03d}", 
             description=f"Component {i}",
             igt="",
-            componenets={},
+            components={},
             sales_history=[]
         )
         for i in range(1, 6)

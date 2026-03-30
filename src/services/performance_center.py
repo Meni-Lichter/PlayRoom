@@ -93,7 +93,7 @@ class PerformanceCenter:
         elif isinstance(entity.g_entity, TwelveNC):
             for tnc_obj in self.nc12s:
                 if tnc_obj.id == entity.g_entity.id:
-                    return tnc_obj.componenets
+                    return tnc_obj.components
         else:
             raise ValueError("Entity must be of type Room or TwelveNC")
 

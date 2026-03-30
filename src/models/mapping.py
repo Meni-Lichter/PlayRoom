@@ -9,26 +9,26 @@ class Room:
 
     id: str
     description: str
-    componenets: Dict[str, int]  # {12NC: quantity}
+    components: Dict[str, int]  # {12NC: quantity}
     sales_history: List[SalesRecord]  # {12NC: SalesRecord}
 
     @property
     def twelve_ncs(self) -> Dict[str, int]:
-        """Alias for componenets field"""
-        return self.componenets
+        """Alias for components field"""
+        return self.components
 
     @property
     def total_items(self) -> int:
         """Total number of items in room"""
-        return sum(self.componenets.values())
+        return sum(self.components.values())
 
     def has_12nc(self, twelve_nc: str) -> bool:
         """Check if room contains specific 12NC"""
-        return twelve_nc in self.componenets
+        return twelve_nc in self.components
 
     def show_12ncs(self) -> None:
         print(f"Room: {self.id} contains the following 12NCs:")
-        for nc, qty in self.componenets.items():
+        for nc, qty in self.components.items():
             print(f"12NC: {nc}, Quantity: {qty}")
 
     def show_sales_history(self) -> None:
@@ -61,26 +61,26 @@ class TwelveNC:
     id: str
     description: str
     igt: str
-    componenets: Dict[str, int]  # {room: quantity}
+    components: Dict[str, int]  # {room: quantity}
     sales_history: List[SalesRecord]  # {room: SalesRecord}
 
     @property
     def rooms(self) -> Dict[str, int]:
-        """Alias for componenets field"""
-        return self.componenets
+        """Alias for components field"""
+        return self.components
 
     @property
     def total_items(self) -> int:
         """Total number of items for 12NC"""
-        return sum(self.componenets.values())
+        return sum(self.components.values())
 
     def has_room(self, room: str) -> bool:
         """Check if 12NC is in specific room"""
-        return room in self.componenets
+        return room in self.components
 
     def show_rooms(self) -> None:
         print(f"12NC: {self.id} is found in the following rooms:")
-        for room, qty in self.componenets.items():
+        for room, qty in self.components.items():
             print(f"Room: {room}, Quantity: {qty}")
 
     def show_sales_history(self) -> None:

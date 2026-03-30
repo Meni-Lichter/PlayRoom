@@ -60,7 +60,7 @@ def sample_rooms():
         room = Room(
             id=f"ROOM_{i:03d}", 
             description=f"Test Room {i}",
-            componenets={},
+            components={},
             sales_history=[]
         )
         rooms.append(room)
@@ -76,7 +76,7 @@ def sample_12ncs():
             id=f"12NC_{i:03d}", 
             description=f"Test Component {i}",
             igt="",
-            componenets={},
+            components={},
             sales_history=[]
         )
         nc12s.append(nc12)

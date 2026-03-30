@@ -136,7 +136,8 @@ class EntityModeScreen(ctk.CTkFrame):
             self.belonging_panel,
             self.COLORS,
             self.FONT_SIZES,
-            self._get_font
+            self._get_font,
+            navigate_callback=self._navigate_to_entity
         )
         
         self.performance_panel_manager = PerformancePanel(
@@ -984,6 +985,34 @@ class EntityModeScreen(ctk.CTkFrame):
                         return nc12
         
         return None
+    
+    def _navigate_to_entity(self, entity_id: str, target_mode: str):
+        """Navigate to a different entity (used by belonging panel clicks)
+        
+        Args:
+            entity_id: ID of the entity to navigate to
+            target_mode: Mode to switch to ('12nc' or 'room')
+        
+        Does:
+            Switches to the target mode, sets the entity as selected, and updates all panels
+        
+        Returns: None
+        """
+        # Switch to target mode if different
+        if self.current_mode != target_mode:
+            self._switch_mode(target_mode)
+        
+        # Set the entity as selected for the current mode
+        if target_mode == "12nc":
+            self.selected_entity_12nc = entity_id
+        else:
+            self.selected_entity_room = entity_id
+        
+        # Update search box to reflect navigation
+        self.search_var.set(entity_id)
+        
+        # Update all panels with the new entity
+        self._update_panels()
     
     # ============================================================================
     # PANEL UPDATE METHODS

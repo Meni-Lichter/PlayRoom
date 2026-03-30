@@ -61,7 +61,7 @@ def transform_cbom_data(
             Room(
                 id=room,
                 description=description,
-                componenets=twelve_ncs_dict,  # Use the dict, not valid_twelve_ncs
+                components=twelve_ncs_dict,  # Use the dict, not valid_twelve_ncs
                 sales_history=[],
             )
         )
@@ -100,7 +100,7 @@ def transform_cbom_data(
                 id=nc12,
                 description=description,
                 igt=igt,
-                componenets=room_dict,
+                components=room_dict,
                 sales_history=[],
             )
         )
