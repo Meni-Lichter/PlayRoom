@@ -569,14 +569,14 @@ class EntityModeScreen(ctk.CTkFrame):
         )
         excel_btn.pack(side="left", padx=2)
         
-        # PNG export
-        png_btn = self._create_icon_button(
+        # PDF export
+        pdf_btn = self._create_icon_button(
             export_frame,
-            "🖼️",
-            lambda: self._export_panel(title, "png"),
-            "Export as PNG image"
+            "📄",
+            lambda: self._export_panel(title, "pdf"),
+            "Export as PDF"
         )
-        png_btn.pack(side="left", padx=2)
+        pdf_btn.pack(side="left", padx=2)
         
         # Separator
         separator = ctk.CTkFrame(panel, height=1, fg_color=self.COLORS["border"])
@@ -1061,10 +1061,10 @@ class EntityModeScreen(ctk.CTkFrame):
     # ============================================================================
     
     def _export_panel(self, panel_title, format_type):
-        """Export panel data to Excel or PNG
+        """Export panel data to Excel or PDF
             Args:
                 panel_title: The title of the panel to export
-                format_type: The format to export (e.g., 'excel' or 'png')
+                format_type: The format to export (e.g., 'excel' or 'pdf')
             Does: Exports the panel data to the specified format
             Returns: None
         """

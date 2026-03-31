@@ -61,8 +61,8 @@ class PerformancePanel:
         self.figure = None
         self.ax = None
         self.year_checkboxes = {}
-        self.range_slider_start = None
-        self.range_slider_end = None
+        self.range_dropdown_start = None
+        self.range_dropdown_end = None
         self.granularity_dropdown = None
     
     def update(self, entity_obj, mode):
@@ -169,23 +169,24 @@ class PerformancePanel:
         self._build_chart(chart_frame)
     
     def _build_controls(self, parent):
-        """Build control widgets (granularity dropdown, year checkboxes, range slider)
+        """Build control widgets (granularity dropdown, time range dropdowns, year checkboxes)
         Args:
             parent: Parent frame for controls
         Does: Creates the controls for adjusting the chart, including a dropdown for granularity,
-        checkboxes for selecting years, and sliders for adjusting the time range.
+        dropdowns for time range selection (start/end), and checkboxes for selecting years.
         Returns: None
         """
-        inner_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        inner_frame.pack(fill="x", padx=20, pady=15)
+        # Outer frame for centering
+        outer_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        outer_frame.pack(fill="x", padx=20, pady=15)
         
-        # Row 1: Granularity and Year filters
-        row1_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
-        row1_frame.pack(fill="x", pady=(0, 15))
+        # Inner frame with all controls - centered
+        controls_frame = ctk.CTkFrame(outer_frame, fg_color="transparent")
+        controls_frame.pack(anchor="center")
         
         # 1. Granularity dropdown
         granularity_label = ctk.CTkLabel(
-            row1_frame,
+            controls_frame,
             text="Granularity:",
             font=self._get_font(size=self.FONT_SIZES["small"], weight="bold"),
             text_color=self.COLORS["text_dark"]
@@ -193,7 +194,7 @@ class PerformancePanel:
         granularity_label.pack(side="left", padx=(0, 10))
         
         self.granularity_dropdown = ctk.CTkOptionMenu(
-            row1_frame,
+            controls_frame,
             values=["Months", "Quarters", "Years"],
             command=self._on_granularity_change,
             width=120,
@@ -204,9 +205,63 @@ class PerformancePanel:
         self.granularity_dropdown.set(self.granularity)
         self.granularity_dropdown.pack(side="left", padx=(0, 30))
         
-        # 2. Year checkboxes
+        # 2. Time Range dropdowns
+        time_range_label = ctk.CTkLabel(
+            controls_frame,
+            text="Time Range:",
+            font=self._get_font(size=self.FONT_SIZES["small"], weight="bold"),
+            text_color=self.COLORS["text_dark"]
+        )
+        time_range_label.pack(side="left", padx=(0, 10))
+        
+        # From dropdown
+        from_label = ctk.CTkLabel(
+            controls_frame,
+            text="From:",
+            font=self._get_font(size=self.FONT_SIZES["small"]),
+            text_color=self.COLORS["text_muted"]
+        )
+        from_label.pack(side="left", padx=(0, 5))
+        
+        all_periods = self._get_all_period_labels()
+        self.range_dropdown_start = ctk.CTkOptionMenu(
+            controls_frame,
+            values=all_periods if all_periods else ["1"],
+            command=lambda _: self._on_range_change(None),
+            width=100,
+            fg_color=self.COLORS["accent_teal"],
+            button_color=self.COLORS["accent_teal"],
+            button_hover_color="#1C7A7A"
+        )
+        self.range_dropdown_start.set(all_periods[0] if all_periods else "1")
+        self.range_dropdown_start.pack(side="left", padx=(0, 15))
+        
+        # To dropdown
+        to_label = ctk.CTkLabel(
+            controls_frame,
+            text="To:",
+            font=self._get_font(size=self.FONT_SIZES["small"]),
+            text_color=self.COLORS["text_muted"]
+        )
+        to_label.pack(side="left", padx=(0, 5))
+        
+        max_periods = self._get_max_periods()
+        self.range_dropdown_end = ctk.CTkOptionMenu(
+            controls_frame,
+            values=all_periods if all_periods else ["1"],
+            command=lambda _: self._on_range_change(None),
+            width=100,
+            fg_color=self.COLORS["accent_teal"],
+            button_color=self.COLORS["accent_teal"],
+            button_hover_color="#1C7A7A"
+        )
+        end_idx = max_periods - 1 if all_periods else 0
+        self.range_dropdown_end.set(all_periods[end_idx] if all_periods and end_idx < len(all_periods) else "1")
+        self.range_dropdown_end.pack(side="left", padx=(0, 30))
+        
+        # 3. Year checkboxes
         years_label = ctk.CTkLabel(
-            row1_frame,
+            controls_frame,
             text="Years:",
             font=self._get_font(size=self.FONT_SIZES["small"], weight="bold"),
             text_color=self.COLORS["text_dark"]
@@ -218,7 +273,7 @@ class PerformancePanel:
             color = self.year_colors.get(year, "#666666")
             
             checkbox = ctk.CTkCheckBox(
-                row1_frame,
+                controls_frame,
                 text=str(year),
                 command=lambda y=year: self._on_year_toggle(y),
                 font=self._get_font(size=self.FONT_SIZES["small"]),
@@ -230,97 +285,6 @@ class PerformancePanel:
             checkbox.pack(side="left", padx=(0, 15))
             
             self.year_checkboxes[year] = checkbox
-        
-        # 3. Time range slider
-        row2_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
-        row2_frame.pack(fill="x")
-        
-        slider_label = ctk.CTkLabel(
-            row2_frame,
-            text="Time Range:",
-            font=self._get_font(size=self.FONT_SIZES["small"], weight="bold"),
-            text_color=self.COLORS["text_dark"]
-        )
-        slider_label.pack(anchor="w", pady=(0, 5))
-        
-        # Slider container
-        slider_container = ctk.CTkFrame(row2_frame, fg_color="transparent")
-        slider_container.pack(fill="x")
-        slider_container.grid_columnconfigure(1, weight=1)
-        
-        # Start slider
-        start_label = ctk.CTkLabel(
-            slider_container,
-            text="Start:",
-            font=self._get_font(size=self.FONT_SIZES["small"]),
-            text_color=self.COLORS["text_muted"]
-        )
-        start_label.grid(row=0, column=0, padx=(0, 10), sticky="w")
-        
-        max_periods = self._get_max_periods()
-        self.range_slider_start = ctk.CTkSlider(
-            slider_container,
-            from_=0,
-            to=max_periods - 1,
-            number_of_steps=max_periods - 1,
-            command=self._on_range_change,
-            fg_color=self.COLORS["border"],
-            progress_color=self.COLORS["accent_teal"],
-            button_color=self.COLORS["accent_teal"],
-            button_hover_color="#1C7A7A"
-        )
-        # Default to full range
-        self.range_slider_start.set(0)
-        self.range_slider_start.grid(row=0, column=1, sticky="ew", padx=(0, 10))
-        
-        # Get initial period label
-        all_periods = self._get_all_period_labels()
-        start_period_label = all_periods[0] if all_periods else "1"
-        
-        self.start_value_label = ctk.CTkLabel(
-            slider_container,
-            text=start_period_label,
-            font=self._get_font(size=self.FONT_SIZES["small"]),
-            text_color=self.COLORS["text_dark"],
-            width=50
-        )
-        self.start_value_label.grid(row=0, column=2)
-        
-        # End slider
-        end_label = ctk.CTkLabel(
-            slider_container,
-            text="End:",
-            font=self._get_font(size=self.FONT_SIZES["small"]),
-            text_color=self.COLORS["text_muted"]
-        )
-        end_label.grid(row=1, column=0, padx=(0, 10), pady=(10, 0), sticky="w")
-        
-        self.range_slider_end = ctk.CTkSlider(
-            slider_container,
-            from_=0,
-            to=max_periods - 1,
-            number_of_steps=max_periods - 1,
-            command=self._on_range_change,
-            fg_color=self.COLORS["border"],
-            progress_color=self.COLORS["accent_teal"],
-            button_color=self.COLORS["accent_teal"],
-            button_hover_color="#1C7A7A"
-        )
-        # Default to full range
-        self.range_slider_end.set(max_periods - 1)
-        self.range_slider_end.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=(10, 0))
-        
-        # Get end period label
-        end_period_label = all_periods[max_periods - 1] if all_periods else str(max_periods)
-        
-        self.end_value_label = ctk.CTkLabel(
-            slider_container,
-            text=end_period_label,
-            font=self._get_font(size=self.FONT_SIZES["small"]),
-            text_color=self.COLORS["text_dark"],
-            width=50
-        )
-        self.end_value_label.grid(row=1, column=2, pady=(10, 0))
     
     def _build_chart(self, parent):
         """Build matplotlib chart
@@ -593,7 +557,7 @@ class PerformancePanel:
         Args:
             new_granularity: New granularity value
         Does: Updates the granularity state, resets the time range to match the new granularity, 
-        updates the range sliders, and refreshes the chart.
+        updates the range dropdowns, and refreshes the chart.
         Returns: None
         """
         self.granularity = new_granularity
@@ -602,19 +566,17 @@ class PerformancePanel:
         max_periods = self._get_max_periods()
         self.time_range = (0, max_periods - 1)
         
-        # Update sliders
-        if self.range_slider_start and self.range_slider_end:
-            self.range_slider_start.configure(to=max_periods - 1, number_of_steps=max_periods - 1)
-            self.range_slider_start.set(0)
-            self.range_slider_end.configure(to=max_periods - 1, number_of_steps=max_periods - 1)
-            self.range_slider_end.set(max_periods - 1)
-            
-            # Update labels with period names
+        # Update dropdowns
+        if self.range_dropdown_start and self.range_dropdown_end:
             all_periods = self._get_all_period_labels()
-            start_label = all_periods[0] if all_periods else "1"
-            end_label = all_periods[max_periods - 1] if all_periods and len(all_periods) > max_periods - 1 else str(max_periods)
-            self.start_value_label.configure(text=start_label)
-            self.end_value_label.configure(text=end_label)
+            
+            # Update dropdown values
+            self.range_dropdown_start.configure(values=all_periods)
+            self.range_dropdown_end.configure(values=all_periods)
+            
+            # Set default selections
+            self.range_dropdown_start.set(all_periods[0] if all_periods else "1")
+            self.range_dropdown_end.set(all_periods[max_periods - 1] if all_periods and max_periods - 1 < len(all_periods) else all_periods[-1] if all_periods else "1")
         
         # Update chart
         self._update_chart()
@@ -623,7 +585,8 @@ class PerformancePanel:
         """Handle year checkbox toggle
         Args:
             year: Year that was toggled
-        Does: Adds or removes the year from the selected_years set based on the checkbox state, then updates the chart.
+        Does: Adds or removes the year from the selected_years set based on the checkbox state, 
+              and for yearly granularity adjusts dropdowns to match the selected year range, then updates the chart.
         Returns: None
         """
         if year in self.selected_years:
@@ -631,42 +594,88 @@ class PerformancePanel:
         else:
             self.selected_years.add(year)
         
+        # For yearly granularity: sync dropdowns with selected years
+        if self.granularity == "Years" and self.selected_years:
+            all_periods = self._get_all_period_labels()
+            
+            # Find the range that includes all selected years
+            selected_year_indices = []
+            for idx, period in enumerate(all_periods):
+                try:
+                    period_year = int(period)
+                    if period_year in self.selected_years:
+                        selected_year_indices.append(idx)
+                except ValueError:
+                    pass
+            
+            if selected_year_indices:
+                # Set dropdowns to span from min to max selected year
+                min_idx = min(selected_year_indices)
+                max_idx = max(selected_year_indices)
+                
+                if self.range_dropdown_start and self.range_dropdown_end:
+                    self.range_dropdown_start.set(all_periods[min_idx])
+                    self.range_dropdown_end.set(all_periods[max_idx])
+                    self.time_range = (min_idx, max_idx)
+        
         # Update chart
         self._update_chart()
     
     def _on_range_change(self, value):
-        """Handle range slider change
+        """Handle range dropdown change
         Args:
-            value: Slider value (not used, we read directly from sliders)
-        Does: Updates the time range based on the slider values, ensures start <= end, updates labels, and refreshes the chart.
+            value: Dropdown value (not used, we read directly from dropdowns)
+        Does: Updates the time range based on the dropdown selections, ensures start <= end, and refreshes the chart.
         Returns: None
         """
-        # Validate sliders exist
-        if not self.range_slider_start or not self.range_slider_end:
+        # Validate dropdowns exist
+        if not self.range_dropdown_start or not self.range_dropdown_end:
             return
-            
-        start = int(self.range_slider_start.get())
-        end = int(self.range_slider_end.get())
+        
+        all_periods = self._get_all_period_labels()
+        if not all_periods:
+            return
+        
+        # Get selected values
+        start_value = self.range_dropdown_start.get()
+        end_value = self.range_dropdown_end.get()
+        
+        # Find indices
+        try:
+            start = all_periods.index(start_value)
+            end = all_periods.index(end_value)
+        except ValueError:
+            return
         
         # Ensure start <= end
         if start > end:
-            if self.time_range[0] != start:
-                # Start was changed, adjust end
-                self.range_slider_end.set(start)
-                end = start
-            else:
-                # End was changed, adjust start
-                self.range_slider_start.set(end)
-                start = end
+            # Swap to maintain valid range
+            start, end = end, start
+            self.range_dropdown_start.set(all_periods[start])
+            self.range_dropdown_end.set(all_periods[end])
         
         self.time_range = (start, end)
         
-        # Update labels with period names
-        all_periods = self._get_all_period_labels()
-        start_label = all_periods[start] if all_periods and start < len(all_periods) else str(start + 1)
-        end_label = all_periods[end] if all_periods and end < len(all_periods) else str(end + 1)
-        self.start_value_label.configure(text=start_label)
-        self.end_value_label.configure(text=end_label)
+        # For yearly granularity: sync checkboxes with visible year range
+        if self.granularity == "Years":
+            visible_periods = all_periods[start:end + 1]
+            visible_years = set()
+            for period in visible_periods:
+                try:
+                    visible_years.add(int(period))
+                except ValueError:
+                    pass
+            
+            # Update checkboxes and selected_years to match visible range
+            for year, checkbox in self.year_checkboxes.items():
+                if year in visible_years:
+                    if year not in self.selected_years:
+                        self.selected_years.add(year)
+                        checkbox.select()
+                else:
+                    if year in self.selected_years:
+                        self.selected_years.remove(year)
+                        checkbox.deselect()
         
         # Update chart
         self._update_chart()
@@ -686,13 +695,14 @@ class PerformancePanel:
         for bar, value in zip(bars, values):
             if value > 0:
                 height = bar.get_height()
-                self.ax.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    height,
-                    f'{int(value)}',
-                    ha='center',
-                    va='bottom',
-                    fontsize=8,
-                    fontweight='bold',
-                    color='#333333'
-                )
+                if self.ax:
+                    self.ax.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        height,
+                        f'{int(value)}',
+                        ha='center',
+                        va='bottom',
+                        fontsize=8,
+                        fontweight='bold',
+                        color='#333333'
+                    )
