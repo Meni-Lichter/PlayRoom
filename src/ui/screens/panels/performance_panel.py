@@ -293,13 +293,26 @@ class PerformancePanel:
         Does: Initializes the matplotlib figure and canvas for displaying the sales performance chart.
         Returns: None
         """
+        # Header frame for title and sum
+        header_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        header_frame.pack(fill="x", padx=15, pady=(15,0))
+        
+        # Sum label at the top right
+        self.sum_label = ctk.CTkLabel(
+            header_frame,
+            text="Total: 0",
+            font=self._get_font(size=self.FONT_SIZES["body"], weight="bold"),
+            text_color=self.COLORS["accent_teal"]
+        )
+        self.sum_label.pack(side="right")
+        
         # Create matplotlib figure
         self.figure = Figure(figsize=(10, 6), dpi=100, facecolor='white')
         self.ax = self.figure.add_subplot(111)
         
         # Create canvas
         self.canvas = FigureCanvasTkAgg(self.figure, parent)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=15, pady=15)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=15, pady=(5,15))
     
     def _get_max_periods(self) -> int:
         """Get maximum number of periods based on granularity"""
@@ -543,9 +556,19 @@ class PerformancePanel:
         if self.selected_years and self.granularity != "Years":
             self.ax.legend(loc='upper right', framealpha=0.9, edgecolor='#CCCCCC')
         
+        # Calculate and update total sum
+        total_sum = 0
+        for year in self.selected_years:
+            if year in data:
+                for period in filtered_periods:
+                    if period in data[year]:
+                        total_sum += data[year][period]
+        
+        if hasattr(self, 'sum_label'):
+            self.sum_label.configure(text=f"Total: {int(total_sum)}")
+        
         # Tight layout
         if self.figure:
-
             self.figure.tight_layout()
         
         # Redraw canvas

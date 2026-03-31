@@ -348,12 +348,16 @@ class WelcomeScreen(ctk.CTkFrame):
             # Build lookup dictionaries for O(1) entity access across all screens
             rooms_dict: dict[str, Room] = {room.id: room for room in rooms}
             nc12s_dict: dict[str, TwelveNC] = {nc12.id: nc12 for nc12 in nc12s}
+            print(f"\n[WELCOME] Created dictionaries: {len(rooms_dict)} rooms, {len(nc12s_dict)} 12NCs")
+            print(f"[WELCOME] Sample room keys: {list(rooms_dict.keys())[:3] if rooms_dict else 'None'}")
+            print(f"[WELCOME] Sample 12NC keys: {list(nc12s_dict.keys())[:3] if nc12s_dict else 'None'}")
             
             # Store only the dictionaries - lists and raw data not needed
             self.app_controller.current_data = {
                 "rooms_dict": rooms_dict,
                 "nc12s_dict": nc12s_dict
             }
+            print(f"[WELCOME] Stored in app_controller.current_data")
             
             # Store loaded file paths
             self.app_controller.set_loaded_files(self.loaded_files)
@@ -361,7 +365,9 @@ class WelcomeScreen(ctk.CTkFrame):
             # Update entity screens if they exist
             if "entity_mode" in self.app_controller.screens:
                 entity_screen = self.app_controller.screens["entity_mode"]
+                print(f"[WELCOME] Calling entity_screen.reload_data_from_uploaded_files()")
                 entity_screen.reload_data_from_uploaded_files(rooms_dict, nc12s_dict)
+                print(f"[WELCOME] Entity screen updated")
             
             # Success message with counts
             self.status_label.configure(

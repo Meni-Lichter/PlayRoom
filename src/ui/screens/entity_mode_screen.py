@@ -186,6 +186,7 @@ class EntityModeScreen(ctk.CTkFrame):
         Does: Updates the MODE_CONFIG items with new entity IDs from the uploaded files and refreshes the dropdown
         Returns: None
         """
+        print(f"\n[ENTITY_MODE] reload_data_from_uploaded_files called: {len(rooms_dict)} rooms, {len(nc12s_dict)} 12NCs")
         # Extract and sort IDs from the dictionaries
         room_ids = sorted(rooms_dict.keys())
         nc12_ids = sorted(nc12s_dict.keys())
@@ -198,6 +199,9 @@ class EntityModeScreen(ctk.CTkFrame):
         if hasattr(self.app_controller, 'current_data') and self.app_controller.current_data:
             self.app_controller.current_data['rooms_dict'] = rooms_dict
             self.app_controller.current_data['nc12s_dict'] = nc12s_dict
+            print(f"[ENTITY_MODE] Updated app_controller.current_data")
+        else:
+            print(f"[ENTITY_MODE] WARNING: app_controller.current_data not available!")
         
         # Update current mode's all_items
         self.all_items = self.MODE_CONFIG[self.current_mode]["items"]
@@ -927,23 +931,28 @@ class EntityModeScreen(ctk.CTkFrame):
             Does: Updates the content of all panels based on the currently selected entity
             Returns: None
         """
+        print(f"\n[ENTITY_MODE] _update_panels called for mode={self.current_mode}")
         # Get selected entity for current mode
         selected_entity = self.selected_entity_12nc if self.current_mode == "12nc" else self.selected_entity_room
         
         if not selected_entity:
             # Clear panels if no entity selected for this mode
+            print("[ENTITY_MODE] No selected entity - clearing panels")
             self._clear_panels()
             return
         
+        print(f"[ENTITY_MODE] Selected entity: {selected_entity}")
         # Get the entity object from current_data
         entity_obj = self._get_entity_object(selected_entity)
         
         if entity_obj:
+            print(f"[ENTITY_MODE] Entity object found: {type(entity_obj).__name__}")
             # Update each panel with entity data
             self._update_details_panel(entity_obj)
             self._update_belonging_panel(entity_obj)
             self._update_performance_panel(entity_obj)
             self._update_prediction_panel(entity_obj)
+            print("[ENTITY_MODE] All panels updated")
         else:
             print(f"Entity not found: {selected_entity}")
     
@@ -972,8 +981,10 @@ class EntityModeScreen(ctk.CTkFrame):
             Does: Retrieves the Room or TwelveNC object from lookup dictionaries
             Returns: The entity object if found, None otherwise
         """
+        print(f"[ENTITY_MODE] _get_entity_object({entity_id}) for mode={self.current_mode}")
         # Use app controller's lookup dictionaries for O(1) access
         if not hasattr(self.app_controller, 'current_data') or not self.app_controller.current_data:
+            print(f"[ENTITY_MODE] ERROR: app_controller.current_data not available!")
             return None
         
         current_data = self.app_controller.current_data
@@ -1074,6 +1085,7 @@ class EntityModeScreen(ctk.CTkFrame):
             Does: Delegates to PredictionPanel manager  
             Returns: None
         """
+        print(f"[ENTITY_MODE] Calling prediction panel update for {entity_obj}")
         self.prediction_panel_manager.update(entity_obj, self.current_mode)
     
     # ============================================================================
