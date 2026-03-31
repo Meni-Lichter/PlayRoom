@@ -54,7 +54,7 @@ class DetailsPanel:
         # Mode-specific details
         if mode == "room":
             self._add_room_details(details_container, entity_obj)
-        else:  # 12nc mode
+        elif mode == "12nc":  # 12nc mode
             self._add_12nc_details(details_container, entity_obj)
         
         # Sales history summary

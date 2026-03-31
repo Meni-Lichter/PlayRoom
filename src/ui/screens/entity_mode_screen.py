@@ -1007,7 +1007,6 @@ class EntityModeScreen(ctk.CTkFrame):
     
     def _navigate_to_entity(self, entity_id: str, target_mode: str):
         """Navigate to a different entity (used by belonging panel clicks)
-        
         Args:
             entity_id: ID of the entity to navigate to
             target_mode: Mode to switch to ('12nc' or 'room')
@@ -1017,23 +1016,26 @@ class EntityModeScreen(ctk.CTkFrame):
         
         Returns: None
         """
-        # Switch to target mode if different
-        if self.current_mode != target_mode:
-            self._switch_mode(target_mode)
-        
-        # Set the entity as selected for the current mode
+        if target_mode not in ["12nc", "room"] or not entity_id:
+            print(f"Invalid navigation target: {entity_id} in mode {target_mode}")
+            return
+
+        # Set the entity as selected for the target mode FIRST (before mode switch)
         if target_mode == "12nc":
             self.selected_entity_12nc = entity_id
         else:
             self.selected_entity_room = entity_id
         
-        # Update search box to reflect navigation
+        # Update search box before mode switch
         self.search_var.set(entity_id)
-        # hide dropdown if navigating from a click
         self._hide_dropdown()
         
-        # Update all panels with the new entity
-        self._update_panels()
+        # Switch to target mode if different (this will update panels with new entity)
+        if self.current_mode != target_mode:
+            self._switch_mode(target_mode)
+        else:
+            # Same mode, just update panels with new entity
+            self._update_panels()
     
     # ============================================================================
     # PANEL UPDATE METHODS

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
-from src.models.mapping import Room
+from src.models.mapping import Room, TwelveNC
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -347,7 +347,7 @@ class WelcomeScreen(ctk.CTkFrame):
             
             # Build lookup dictionaries for O(1) entity access across all screens
             rooms_dict: dict[str, Room] = {room.id: room for room in rooms}
-            nc12s_dict = {nc12.id: nc12 for nc12 in nc12s}
+            nc12s_dict: dict[str, TwelveNC] = {nc12.id: nc12 for nc12 in nc12s}
             
             # Store only the dictionaries - lists and raw data not needed
             self.app_controller.current_data = {
