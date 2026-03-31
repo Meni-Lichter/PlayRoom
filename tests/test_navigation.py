@@ -554,7 +554,7 @@ class TestCompleteUserJourneys:
         entity_screen = app.current_screen
         entity_screen.search_var.set("12NC_001")
         entity_screen._on_search_button()
-        assert entity_screen.selected_entity == "12NC_001"
+        assert entity_screen.selected_entity_12nc == "12NC_001"
         
         # Switches to Room mode
         app.show_screen("room_mode")
@@ -563,7 +563,7 @@ class TestCompleteUserJourneys:
         # Searches in Room mode
         entity_screen.search_var.set("ROOM_001")
         entity_screen._on_search_button()
-        assert entity_screen.selected_entity == "ROOM_001"
+        assert entity_screen.selected_entity_room == "ROOM_001"
         
         # Explores other sections
         app.show_screen("bulk_view")

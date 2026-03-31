@@ -185,7 +185,7 @@ class TestEntityModeScreen:
         """Test EntityModeScreen initializes correctly in room mode"""
         screen = entity_screen_room_mode
         assert screen.current_mode == "room"
-        assert screen.selected_entity is None
+        assert screen.selected_entity_room is None
         assert hasattr(screen, 'all_items')
         assert len(screen.all_items) == 10  # 10 sample rooms
     
@@ -193,7 +193,7 @@ class TestEntityModeScreen:
         """Test EntityModeScreen initializes correctly in 12nc mode"""
         screen = entity_screen_12nc_mode
         assert screen.current_mode == "12nc"
-        assert screen.selected_entity is None
+        assert screen.selected_entity_12nc is None
         assert hasattr(screen, 'all_items')
         assert len(screen.all_items) == 10  # 10 sample 12ncs
     
@@ -413,7 +413,7 @@ class TestSearchFunctionality:
         screen._on_search_button()
         
         # Verify entity is selected
-        assert screen.selected_entity == "ROOM_001"
+        assert screen.selected_entity_room == "ROOM_001"
     
     def test_search_button_with_no_matches_found(self, entity_screen_room_mode):
         """Test search button click with 'No matches found' text"""
@@ -426,7 +426,7 @@ class TestSearchFunctionality:
         screen._on_search_button()
         
         # Entity should not be selected
-        assert screen.selected_entity is None or screen.selected_entity != "No matches found"
+        assert screen.selected_entity_room is None or screen.selected_entity_room != "No matches found"
     
     def test_prefix_search_filter(self, entity_screen_room_mode):
         """Test that search filter uses startswith (prefix matching)"""
@@ -522,7 +522,7 @@ class TestPanels:
     def test_update_panels_called(self, entity_screen_room_mode):
         """Test that update_panels can be called"""
         screen = entity_screen_room_mode
-        screen.selected_entity = "ROOM_001"
+        screen.selected_entity_room = "ROOM_001"
         
         # Should not raise an error
         screen._update_panels()
@@ -607,7 +607,7 @@ class TestIntegration:
         
         # Step 3: Click search button
         screen._on_search_button()
-        assert screen.selected_entity == "ROOM_001"
+        assert screen.selected_entity_room == "ROOM_001"
         
         # Step 4: Dropdown should be hidden after search
         assert screen.dropdown_visible is False
@@ -623,7 +623,7 @@ class TestIntegration:
         # Perform search in room mode
         screen.search_var.set("ROOM_001")
         screen._on_search_button()
-        assert screen.selected_entity == "ROOM_001"
+        assert screen.selected_entity_room == "ROOM_001"
         
         # Switch to 12nc mode
         screen._on_mode_toggle("12NC")
@@ -632,7 +632,7 @@ class TestIntegration:
         # Verify search still works in 12nc mode
         screen.search_var.set("12NC_001")
         screen._on_search_button()
-        assert screen.selected_entity == "12NC_001"
+        assert screen.selected_entity_12nc == "12NC_001"
 
 
 # ============================================================================

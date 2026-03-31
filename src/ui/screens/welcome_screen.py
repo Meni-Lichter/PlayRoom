@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+from src.models.mapping import Room
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -343,12 +345,14 @@ class WelcomeScreen(ctk.CTkFrame):
             if fit_cvi_df is not None:
                 rooms = parse_fit_cvi_to_sales_records(rooms, fit_cvi_df)
             
-            # Store the loaded data in app controller
+            # Build lookup dictionaries for O(1) entity access across all screens
+            rooms_dict: dict[str, Room] = {room.id: room for room in rooms}
+            nc12s_dict = {nc12.id: nc12 for nc12 in nc12s}
+            
+            # Store only the dictionaries - lists and raw data not needed
             self.app_controller.current_data = {
-                "rooms": rooms,
-                "nc12s": nc12s,
-                "room_data": room_data,
-                "data_12nc": data_12nc
+                "rooms_dict": rooms_dict,
+                "nc12s_dict": nc12s_dict
             }
             
             # Store loaded file paths
@@ -357,11 +361,11 @@ class WelcomeScreen(ctk.CTkFrame):
             # Update entity screens if they exist
             if "entity_mode" in self.app_controller.screens:
                 entity_screen = self.app_controller.screens["entity_mode"]
-                entity_screen.reload_sample_data_from_uploaded_files(rooms, nc12s)
+                entity_screen.reload_data_from_uploaded_files(rooms_dict, nc12s_dict)
             
             # Success message with counts
             self.status_label.configure(
-                text=f"✓ Files loaded successfully! ({len(rooms)} Rooms, {len(nc12s)} 12NCs)",
+                text=f"✓ Files loaded successfully! ({len(rooms_dict)} Rooms, {len(nc12s_dict)} 12NCs)",
                 text_color="#10b981"
             )
             

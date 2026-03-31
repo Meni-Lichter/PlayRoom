@@ -7,7 +7,7 @@ from typing import Callable, Optional
 class BelongingPanel:
     """Manages the Belonging List panel content and updates"""
     
-    def __init__(self, panel_widget, colors, font_sizes, get_font_func, navigate_callback: Optional[Callable] = None):
+    def __init__(self, panel_widget, colors, font_sizes, get_font_func, navigate_callback: Optional[Callable] = None, get_description_callback: Optional[Callable] = None):
         """Initialize the belonging panel manager
         
         Args:
@@ -16,12 +16,14 @@ class BelongingPanel:
             font_sizes: Dictionary of font sizes
             get_font_func: Function to get cached fonts
             navigate_callback: Function to navigate to another entity (entity_id, mode)
+            get_description_callback: Function to get entity description (entity_id, mode)
         """
         self.panel = panel_widget
         self.COLORS = colors
         self.FONT_SIZES = font_sizes
         self._get_font = get_font_func
         self.navigate_callback = navigate_callback
+        self.get_description_callback = get_description_callback
         self.content_frame = None
     
     def update(self, entity_obj, mode):
@@ -190,16 +192,34 @@ class BelongingPanel:
         inner_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
         inner_frame.pack(fill="both", expand=True, padx=15, pady=10)
         
-        # Item ID with icon (left side)
+        # Left side container for ID and description
+        left_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
+        left_frame.pack(side="left", fill="both", expand=True)
+        
+        # Item ID with icon
         icon = "🔧" if target_mode == "12nc" else "🏠"
         id_label = ctk.CTkLabel(
-            inner_frame,
+            left_frame,
             text=f"{icon} {item_id}",
             font=self._get_font(size=self.FONT_SIZES["body"], weight="bold"),
             text_color=self.COLORS["text_dark"],
             anchor="w"
         )
-        id_label.pack(side="left", fill="y")
+        id_label.pack(side="left")
+        
+        # Description (if callback provided) - same line as ID
+        desc_label = None
+        if self.get_description_callback:
+            description = self.get_description_callback(item_id, target_mode)
+            if description:
+                desc_label = ctk.CTkLabel(
+                    left_frame,
+                    text=f" - {description}",
+                    font=self._get_font(size=self.FONT_SIZES["small"]),
+                    text_color="#888888",
+                    anchor="w"
+                )
+                desc_label.pack(side="left", padx=(5, 0))
         
         # Quantity badge (right side)
         qty_text = f"Qty: {quantity}"
@@ -220,7 +240,11 @@ class BelongingPanel:
         
         # Make entire card clickable by binding click events to all widgets
         click_handler = lambda e: self._navigate_to_entity(item_id, target_mode)
-        for widget in [item_frame, inner_frame, id_label, qty_badge]:
+        widgets_to_bind = [item_frame, inner_frame, left_frame, id_label, qty_badge]
+        if desc_label:
+            widgets_to_bind.append(desc_label)
+        
+        for widget in widgets_to_bind:
             widget.bind("<Button-1>", click_handler)
             widget.configure(cursor="hand2")
         
@@ -231,7 +255,7 @@ class BelongingPanel:
         def on_leave(e):
             item_frame.configure(fg_color=bg_color)
         
-        for widget in [item_frame, inner_frame, id_label, qty_badge]:
+        for widget in widgets_to_bind:
             widget.bind("<Enter>", on_enter)
             widget.bind("<Leave>", on_leave)
     

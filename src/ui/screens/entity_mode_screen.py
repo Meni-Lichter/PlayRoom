@@ -79,8 +79,8 @@ class EntityModeScreen(ctk.CTkFrame):
         # Cache fonts to avoid recreating them repeatedly
         self._font_cache = {}
         
-        # Populate sample data from previously loaded CBOM data
-        self._initialize_sample_data_from_controller()
+        # Populate data from previously loaded CBOM data
+        self._initialize_data_from_controller()
         
         # Store all items for current mode (for filtering)
         self.all_items = self.MODE_CONFIG[mode]["items"]
@@ -137,7 +137,8 @@ class EntityModeScreen(ctk.CTkFrame):
             self.COLORS,
             self.FONT_SIZES,
             self._get_font,
-            navigate_callback=self._navigate_to_entity
+            navigate_callback=self._navigate_to_entity,
+            get_description_callback=self._get_entity_description
         )
         
         self.performance_panel_manager = PerformancePanel(
@@ -154,8 +155,8 @@ class EntityModeScreen(ctk.CTkFrame):
             self._get_font
         )
     
-    def _initialize_sample_data_from_controller(self):
-        """Load sample data from app controller's loaded CBOM files
+    def _initialize_data_from_controller(self):
+        """Load data from app controller's loaded CBOM files
             Args: None
             Does: Initializes the MODE_CONFIG items with entity IDs extracted from the app controller's current data, if available
             Returns: None
@@ -165,33 +166,38 @@ class EntityModeScreen(ctk.CTkFrame):
             if hasattr(self.app_controller, 'current_data') and self.app_controller.current_data:
                 current_data = self.app_controller.current_data
                 
-                # Extract Room and TwelveNC objects if available
-                if 'rooms' in current_data:
-                    room_ids = [room.id for room in current_data['rooms']]
-                    self.MODE_CONFIG["room"]["items"] = sorted(room_ids)
+                # Extract Room and TwelveNC IDs for dropdown lists
+                if 'rooms_dict' in current_data:
+                    room_ids = sorted(current_data['rooms_dict'].keys())
+                    self.MODE_CONFIG["room"]["items"] = room_ids
                 
-                if 'nc12s' in current_data:
-                    nc12_ids = [nc12.id for nc12 in current_data['nc12s']]
-                    self.MODE_CONFIG["12nc"]["items"] = sorted(nc12_ids)
+                if 'nc12s_dict' in current_data:
+                    nc12_ids = sorted(current_data['nc12s_dict'].keys())
+                    self.MODE_CONFIG["12nc"]["items"] = nc12_ids
         except (AttributeError, KeyError, TypeError):
             # If data isn't available or in expected format, keep empty lists
             pass
     
-    def reload_sample_data_from_uploaded_files(self, rooms_list, nc12_list):
-        """Update sample data when new CBOM files are uploaded and processed
+    def reload_data_from_uploaded_files(self, rooms_dict, nc12s_dict):
+        """Update data when new CBOM files are uploaded and processed
         Args:
-            rooms_list: List of Room objects from data_transformer
-            nc12_list: List of TwelveNC objects from data_transformer
+            rooms_dict: Dictionary {room_id: Room object}
+            nc12s_dict: Dictionary {nc12_id: TwelveNC object}
         Does: Updates the MODE_CONFIG items with new entity IDs from the uploaded files and refreshes the dropdown
         Returns: None
         """
-        # Extract and sort IDs from the loaded data
-        room_ids = sorted([room.id for room in rooms_list]) if rooms_list else []
-        nc12_ids = sorted([nc12.id for nc12 in nc12_list]) if nc12_list else []
+        # Extract and sort IDs from the dictionaries
+        room_ids = sorted(rooms_dict.keys())
+        nc12_ids = sorted(nc12s_dict.keys())
         
         # Update MODE_CONFIG with actual loaded data
         self.MODE_CONFIG["room"]["items"] = room_ids
         self.MODE_CONFIG["12nc"]["items"] = nc12_ids
+        
+        # Update app controller's lookup dictionaries for all screens to use
+        if hasattr(self.app_controller, 'current_data') and self.app_controller.current_data:
+            self.app_controller.current_data['rooms_dict'] = rooms_dict
+            self.app_controller.current_data['nc12s_dict'] = nc12s_dict
         
         # Update current mode's all_items
         self.all_items = self.MODE_CONFIG[self.current_mode]["items"]
@@ -961,30 +967,43 @@ class EntityModeScreen(ctk.CTkFrame):
                         continue
     
     def _get_entity_object(self, entity_id):
-        """Get the entity object from current_data
+        """Get the entity object from lookup dictionary (O(1) access)
             Args:
                 entity_id: The ID of the entity to retrieve
-            Does: Retrieves the Room or TwelveNC object from app_controller's current_data
+            Does: Retrieves the Room or TwelveNC object from lookup dictionaries
             Returns: The entity object if found, None otherwise
         """
+        # Use app controller's lookup dictionaries for O(1) access
         if not hasattr(self.app_controller, 'current_data') or not self.app_controller.current_data:
             return None
         
         current_data = self.app_controller.current_data
-        
-        # Search in the appropriate list based on current mode
         if self.current_mode == "room":
-            if 'rooms' in current_data:
-                for room in current_data['rooms']:
-                    if room.id == entity_id:
-                        return room
+            return current_data.get('rooms_dict', {}).get(entity_id)
         else:  # 12nc mode
-            if 'nc12s' in current_data:
-                for nc12 in current_data['nc12s']:
-                    if nc12.id == entity_id:
-                        return nc12
+            return current_data.get('nc12s_dict', {}).get(entity_id)
+    
+    def _get_entity_description(self, entity_id: str, entity_type: str) -> str:
+        """Get description for an entity (used by belonging panel) - O(1) lookup
         
-        return None
+        Args:
+            entity_id: ID of the entity
+            entity_type: Type of entity ('12nc' or 'room')
+        
+        Returns:
+            Entity description or empty string if not found
+        """
+        # Use app controller's lookup dictionaries for O(1) access
+        if not hasattr(self.app_controller, 'current_data') or not self.app_controller.current_data:
+            return ""
+        
+        current_data = self.app_controller.current_data
+        if entity_type == "room":
+            entity = current_data.get('rooms_dict', {}).get(entity_id)
+            return entity.description if entity else ""
+        else:  # 12nc
+            entity = current_data.get('nc12s_dict', {}).get(entity_id)
+            return entity.description if entity else ""
     
     def _navigate_to_entity(self, entity_id: str, target_mode: str):
         """Navigate to a different entity (used by belonging panel clicks)

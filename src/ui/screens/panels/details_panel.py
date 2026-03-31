@@ -107,16 +107,18 @@ class DetailsPanel:
         )
         label_widget.pack(side="left", padx=(0, 10))
         
-        # Value
+        # Value (use Entry for copyable text)
         value_font_weight = "bold" if is_header else "normal"
-        value_widget = ctk.CTkLabel(
+        value_widget = ctk.CTkEntry(
             row_frame,
-            text=value,
             font=self._get_font(size=font_size, weight=value_font_weight),
             text_color=self.COLORS["text_muted"] if not is_header else self.COLORS["accent_teal"],
-            anchor="w",
-            wraplength=300
+            fg_color="transparent",
+            border_width=0,
+            state="normal"  # Allow selection and copying
         )
+        value_widget.insert(0, value)
+        value_widget.configure(state="readonly")  # Prevent editing but allow copying
         value_widget.pack(side="left", fill="x", expand=True)
     
     def _add_detail_separator(self, parent):
